@@ -4,7 +4,6 @@ import math
 """
 TODO:
 # Add normal background
-# Add collision
 # Add more realistic driving behaviour
     # Maybe use real physics library for this
 # Add race element (start/finish, lapcounter)
@@ -22,22 +21,19 @@ WINDOW_WIDTH    = 1920
 WINDOW_HEIGHT   = 1080
 WINDOW_SURFACE  = pygame.HWSURFACE|pygame.DOUBLEBUF|pygame.RESIZABLE
 
-class car(pygame.sprite.Sprite):
-
+class Car(pygame.sprite.Sprite):
     def __init__(self, car_image, x, y, rotations=360):
         pygame.sprite.Sprite.__init__(self)
-        # Pre-make all the rotated versions
-        # Is this most effective?
-        # This assumes the start-image is pointing up-screen
         self.rot_img   = []
         self.min_angle = (360 / rotations) 
         for i in range(rotations):
-            # This rotation has to match the angle in radians later
             rotated_image = pygame.transform.rotozoom(car_image, 360-90-(i*self.min_angle), 1)
             self.rot_img.append(rotated_image)
         self.min_angle = math.radians(self.min_angle)
         self.image       = self.rot_img[0]
         self.rect        = self.image.get_rect()
+        self.rect.topleft = (x, y)
+        self.mask = pygame.mask.from_surface(self.image)
         self.rect.center = (x, y)
         self.reversing = False
         self.heading   = 0
@@ -45,11 +41,7 @@ class car(pygame.sprite.Sprite):
         self.velocity  = pygame.math.Vector2(0, 0)
         self.position  = pygame.math.Vector2(x, y)
 
-        #Check this one
-        self.mask      = pygame.mask.from_surface(self.image)
-
     def turn(self, angle_degrees):
-        """Update angle and car image"""
         self.heading += math.radians(angle_degrees) 
         image_index = int(self.heading / self.min_angle) % len(self.rot_img)
         if (self.image != self.rot_img[ image_index ]):
@@ -57,6 +49,8 @@ class car(pygame.sprite.Sprite):
             self.image = self.rot_img[ image_index ]
             self.rect  = self.image.get_rect()
             self.rect.center = (x,y)
+            # need to update mask or collision will use og image
+            self.mask = pygame.mask.from_surface(self.image)
 
     def accelerate(self, amount):
         # Add more realistic way of accelerating + a normal speed cap
@@ -82,8 +76,12 @@ class car(pygame.sprite.Sprite):
         self.position += self.velocity
         self.rect.center = (round(self.position[0]), round(self.position[1]))
 
-    def collision(self):
-        print("check for collision")
+class Background(pygame.sprite.Sprite):
+  def __init__(self):
+    pygame.sprite.Sprite.__init__(self)
+    self.image = pygame.image.load('assets/background.png').convert_alpha()
+    self.mask = pygame.mask.from_surface(self.image)
+    self.rect        = self.image.get_rect()
 
 if __name__ == "__main__":
     pygame.init()
@@ -92,19 +90,32 @@ if __name__ == "__main__":
     pygame.display.set_caption("Car Steering")
 
     ### Bitmaps
-    road_image = road_image = pygame.image.load('assets/background.png')
-    background = pygame.transform.smoothscale(road_image, (WINDOW_WIDTH, WINDOW_HEIGHT))
     car_image  = pygame.image.load('assets/car1.png').convert_alpha()
 
-    ### Sprites
-    black_car = car(car_image, WINDOW_WIDTH//2, WINDOW_HEIGHT//2)
-    car_sprites = pygame.sprite.Group() #Single()
-    car_sprites.add(black_car)
+    pygame.mouse.set_visible(False)
+
+    #create instances of soldier and bullet
+    black_car = Car(car_image, WINDOW_WIDTH//2, WINDOW_HEIGHT//2)
+    background = Background()
+
+    #create soldier and bullet groups
+    car_group = pygame.sprite.Group()
+    background_group = pygame.sprite.Group()
+
+    #add instances to groups
+    car_group.add(black_car)
+    background_group.add(background)
 
     clock = pygame.time.Clock()
     done = False
+
     while not done:
 
+        if pygame.sprite.spritecollide(background, car_group, False, pygame.sprite.collide_mask):
+            window.fill((200, 200, 100))
+        else:
+            window.fill((120, 120, 120))
+        
         for event in pygame.event.get():
             if (event.type == pygame.QUIT):
                 done = True
@@ -114,16 +125,13 @@ if __name__ == "__main__":
                 WINDOW_WIDTH  = event.w
                 WINDOW_HEIGHT = event.h
                 window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_SURFACE)
-                background = pygame.transform.smoothscale(road_image, (WINDOW_WIDTH, WINDOW_HEIGHT))
+                #background = pygame.transform.smoothscale(road_image, (WINDOW_WIDTH, WINDOW_HEIGHT))
             elif (event.type == pygame.KEYUP):
                 if (event.key == pygame.K_r):  
-                    print('resersing')
                     black_car.reverse()
                 elif (event.key == pygame.K_UP):  
-                    print('accelerate')
                     black_car.accelerate(0.5)
                 elif (event.key == pygame.K_DOWN):  
-                    print('brake')
                     black_car.brake()
 
         # Continuous Movement keys
@@ -135,15 +143,12 @@ if __name__ == "__main__":
             if (keys[pygame.K_RIGHT]):
                 black_car.turn(1.0)
 
-        # Update the car(s)
-        car_sprites.update()
-
-        # Update the window
-        window.blit(background, (0, 0)) # backgorund
-        car_sprites.draw(window)
+        car_group.update()
+        background_group.draw(window)
+        car_group.draw(window)
         pygame.display.flip()
 
-        # Clamp FPS
+        # set fps
         clock.tick_busy_loop(60)
 
     pygame.quit()
