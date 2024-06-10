@@ -7,6 +7,7 @@ from pygame.sprite import Sprite
 from pygame.rect import Rect
 from enum import Enum
 from pygame.sprite import RenderUpdates
+import numpy as np
 
 """
 TODO:
@@ -192,42 +193,29 @@ BLUE = (0, 0, 255)
 
 beam_surface = pygame.Surface((500, 500), pygame.SRCALPHA)
 
-# Rewrite this whole function
-def draw_beam(surface, angle, pos, track):
-    c = math.cos(angle)
-    s = math.sin(angle)
 
-    #x = round(car_pos[0] + math.cos(heading) * 200)
-    flip_x = c < 0
-    flip_y = s < 0
-    filpped_mask = track.mask
-    
-    # compute beam final point
-    x_dest = 250 + 500 * abs(c)
-    y_dest = 250 + 500 * abs(s)
+# easy way to get the position of the track walls
+def get_walls(track, width, height):
+    all_walls = []
+    for x in range(0, width):
+        line = []
+        for j in range(0, height):
+            if track.get_at((x, j)):
+                line.append(True)
+            else:
+                line.append(False)
+        all_walls.append(line)
+    wall_pos = np.array([np.array(x) for x in all_walls])
+    return wall_pos
 
-    beam_surface.fill((0, 0, 0, 0))
-
-    # draw a single beam to the beam surface based on computed final point
-    # maybe dont need to draw, only create the mask.
-    # of we draw on fake surface.
-    pygame.draw.line(beam_surface, BLUE, (250, 250), (x_dest, y_dest))
-    beam_mask = pygame.mask.from_surface(beam_surface)
-
-    # find overlap between "global mask" and current beam mask
-    offset_x = 250 - pos[0] if flip_x else pos[0] - 250
-    offset_y = 250 - pos[1] if flip_y else pos[1] - 250
-    hit = filpped_mask.overlap(beam_mask, (offset_x, offset_y))
-    if hit is not None and (hit[0] != pos[0] or hit[1] != pos[1]):
-        hx = 499 - hit[0] if flip_x else hit[0]
-        hy = 499 - hit[1] if flip_y else hit[1]
-        hit_pos = (hx, hy)
-
-        pygame.draw.line(surface, BLUE, pos, hit_pos)
-        pygame.draw.circle(surface, GREEN, hit_pos, 3)
-        #pg.draw.circle(surface, (255, 255, 0), mouse_pos, 3)
-
-
+# We actually want the distance at some point
+def old_cast_ray(car_pos, arr, heading):
+    x, y = 0, 0
+    for i in range(0, 800):
+        x = round(car_pos[0] + math.cos(heading) * i)
+        y = round(car_pos[1] + math.sin(heading) * i)
+        if arr[x, y]:
+            return x, y
 
 if __name__ == "__main__":
     pygame.init()
@@ -254,62 +242,18 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
     done = False
 
-    #finish = pygame.image.load("assets/finish.png")
-    #track = pygame.image.load("assets/track 2.png")
-
     laps = 0
+
+    # Get wall position (lazy way)
+    wall_pos = get_walls(track.mask, WINDOW_WIDTH, WINDOW_HEIGHT)
 
     while not done:
 
         if pygame.sprite.spritecollide(track, car_group, False, pygame.sprite.collide_mask):
-            #print("awwwww")
             black_car.reset()
 
-        # should add a check for collision with finish
         if pygame.sprite.spritecollide(finish, car_group, False, pygame.sprite.collide_mask):
-            #print("we did a lap")
             laps += 1
-
-        # prob need car position to calculate the ray
-        #print(black_car.position)
-        #print(track.mask)
-
-        # can always get all position first
-        # then check against a normal array
-        # maybe a matrix with true or false
-
-        """
-        This is way to slow
-        """
-        # We actually want the distance at some point
-        def old_cast_ray(car_pos, mask, heading):
-            succes = False
-            x, y = 0, 0
-            for i in range(0, 1500):
-                if succes is True:
-                    return x, y
-                else:
-                    try:
-                        x = round(car_pos[0] + math.cos(heading) * i)
-                        y = round(car_pos[1] + math.sin(heading) * i)
-                        print(x, y)
-                        #if mask.get_at((car_pos[0] + i, car_pos[1])):
-                        if mask.get_at((x, y)):
-                            x = x
-                            y = y
-                            succes = True
-                    except IndexError:
-                        continue
-
-                        
-        # Want to cast a ray and find intersection somehow
-        # Can create a mask if we want
-        # Got to get rid of this loop
-        def cast_ray(car_pos, mask, heading):
-            x = round(car_pos[0] + math.cos(heading) * 200)
-            y = round(car_pos[1] + math.sin(heading) * 200)
-            return x, y
-
 
         for event in pygame.event.get():
             if (event.type == pygame.QUIT):
@@ -331,9 +275,9 @@ if __name__ == "__main__":
         car_group.draw(window)
         finish_group.draw(window)
         play_level(window, black_car.speed, laps)
-        draw_beam(window, black_car.heading, black_car.position, track)
-        #xx, yy  = cast_ray(black_car.position, track.mask, black_car.heading)
-        #pygame.draw.line(window, (255, 179, 113), [black_car.position[0], black_car.position[1]], [xx, yy], 5)
+        x, y = old_cast_ray(black_car.position, wall_pos, black_car.heading)
+    
+        pygame.draw.line(window, (255, 179, 113), [black_car.position[0], black_car.position[1]], [x, y], 5)
 
         pygame.display.flip()
         # set fps
