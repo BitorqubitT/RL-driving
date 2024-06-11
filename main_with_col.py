@@ -209,8 +209,9 @@ def get_walls(track, width, height):
     return wall_pos
 
 # We actually want the distance at some point
-def old_cast_ray(car_pos, arr, heading):
+def cast_ray(car_pos, arr, heading, angle_offset):
     x, y = 0, 0
+    heading = heading + angle_offset
     for i in range(0, 800):
         x = round(car_pos[0] + math.cos(heading) * i)
         y = round(car_pos[1] + math.sin(heading) * i)
@@ -275,9 +276,17 @@ if __name__ == "__main__":
         car_group.draw(window)
         finish_group.draw(window)
         play_level(window, black_car.speed, laps)
-        x, y = old_cast_ray(black_car.position, wall_pos, black_car.heading)
-    
+
+        # Cast diff rays
+        x, y = cast_ray(black_car.position, wall_pos, black_car.heading, 0)
         pygame.draw.line(window, (255, 179, 113), [black_car.position[0], black_car.position[1]], [x, y], 5)
+
+        x, y = cast_ray(black_car.position, wall_pos, black_car.heading, 80)
+        pygame.draw.line(window, (255, 179, 113), [black_car.position[0], black_car.position[1]], [x, y], 5)
+
+        x, y = cast_ray(black_car.position, wall_pos, black_car.heading, -80)
+        pygame.draw.line(window, (255, 179, 113), [black_car.position[0], black_car.position[1]], [x, y], 5)
+
 
         pygame.display.flip()
         # set fps
