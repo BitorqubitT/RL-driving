@@ -11,20 +11,17 @@ import numpy as np
 
 """
 TODO:
-# Draw lines to edge and calc distance
+# Clean up ui.py and main
+# Reward function - calc distance on track and timer.
+# Be able to spawn multiple cars
 # Smaller car, better track
-# Calculate time per lap (save these)
-# Add player class, make it possible for multiple cars
 # Draw functions maybe that draws everything
-# How to clean code? (break up parts), functions, classes
 # Make sure its easy to change levels
-# ENUM CLASS????????????????? for gamestate or something 
-# Statistics: raceline, pos+speed, crashes (write them to csv?)
-# PEP8 + gpt
-
-TODO BUGS:
-
-# How to add deepL
+# Clean code + PEP8
+# Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
+# USE NEAT (need different setup)
+# USE DQN 
+# Faster time
 """
 
 # Window size
@@ -32,12 +29,10 @@ WINDOW_WIDTH    = 1920
 WINDOW_HEIGHT   = 1080
 WINDOW_SURFACE  = pygame.HWSURFACE|pygame.DOUBLEBUF|pygame.RESIZABLE
 
-# Use enum to capture overall info
-# Amount of player and rounds
-# Or do we use enum only for information that is NON static
-
-#class GameInfo(Enum):
-#    Rounds = 5
+BLUE = (106, 159, 181)
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
 
 class Car(pygame.sprite.Sprite):
     def __init__(self, car_image, x, y, rotations=360):
@@ -74,8 +69,7 @@ class Car(pygame.sprite.Sprite):
 
     def accelerate(self, amount):
         # Add more realistic way of accelerating + a normal speed cap
-        if (not self.reversing):
-            if self.speed <= 10:
+        if self.speed <= 10:
                 self.speed += amount
         else: 
             self.speed -= amount
@@ -85,11 +79,6 @@ class Car(pygame.sprite.Sprite):
         self.speed /= 2
         if (abs(self.speed) < 0.1):
             self.speed = 0
-
-    def reverse(self):
-        # Do we need reverse?
-        self.speed     = 0
-        self.reversing = not self.reversing
 
     def update(self):
         self.velocity.from_polar((self.speed, math.degrees(self.heading)))
@@ -119,11 +108,7 @@ def move(black_car, keys):
         if (keys[pygame.K_RIGHT]):
             black_car.turn(1.0)
 
-#COLLISION function
-BLUE = (106, 159, 181)
-WHITE = (255, 255, 255)
-
-def play_level(screen, speed, laps):
+def play_level(screen, sens1, sens2, sens3, speed, laps):
     lap_time = UIElement(
         center_position=(1840, 60),
         font_size=20,
@@ -132,16 +117,32 @@ def play_level(screen, speed, laps):
         text="Lap time",
     )
 
-    x = UIElement(
+    sens1 = UIElement(
         center_position=(1840, 90),
         font_size=20,
         bg_rgb=BLUE,
         text_rgb=WHITE,
-        text="X, Y, Z",
+        text=f"sens1: {sens1}",
+    )
+
+    sens2 = UIElement(
+        center_position=(1840, 120),
+        font_size=20,
+        bg_rgb=BLUE,
+        text_rgb=WHITE,
+        text=f"sens2: {sens2}",
+    )
+
+    sens3 = UIElement(
+        center_position=(1840, 150),
+        font_size=20,
+        bg_rgb=BLUE,
+        text_rgb=WHITE,
+        text=f"sens3: {sens3}",
     )
 
     speed = UIElement(
-        center_position=(1840, 120),
+        center_position=(1840, 180),
         font_size=20,
         bg_rgb=BLUE,
         text_rgb=WHITE,
@@ -149,7 +150,7 @@ def play_level(screen, speed, laps):
     )
 
     lap_counter = UIElement(
-        center_position=(1840, 150),
+        center_position=(1840, 210),
         font_size=20,
         bg_rgb=BLUE,
         text_rgb=WHITE,
@@ -157,9 +158,13 @@ def play_level(screen, speed, laps):
     )
 
     lap_time.draw(screen)
-    x.draw(screen)
     speed.draw(screen)
     lap_counter.draw(screen)
+    sens1.draw(screen)
+    sens2.draw(screen)
+    sens3.draw(screen)
+
+
 
 def create_surface_with_text(text, font_size, text_rgb, bg_rgb):
     """ Returns surface with text written on """
@@ -186,13 +191,6 @@ class UIElement(Sprite):
 
     def draw(self, surface):
         surface.blit(self.image, self.rect)
-
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-
-beam_surface = pygame.Surface((500, 500), pygame.SRCALPHA)
-
 
 # easy way to get the position of the track walls
 def get_walls(track, width, height):
@@ -223,8 +221,6 @@ if __name__ == "__main__":
     window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_SURFACE)
     pygame.display.set_caption("Car sim :)")
 
-    START_POS = 800, 200
-
     ### Bitmaps
     black_car = Car("assets/car1.png", 950, 100)
     background = pygame.image.load("assets/background2.png")
@@ -242,7 +238,6 @@ if __name__ == "__main__":
 
     clock = pygame.time.Clock()
     done = False
-
     laps = 0
 
     # Get wall position (lazy way)
@@ -252,7 +247,6 @@ if __name__ == "__main__":
 
         if pygame.sprite.spritecollide(track, car_group, False, pygame.sprite.collide_mask):
             black_car.reset()
-
         if pygame.sprite.spritecollide(finish, car_group, False, pygame.sprite.collide_mask):
             laps += 1
 
@@ -260,9 +254,7 @@ if __name__ == "__main__":
             if (event.type == pygame.QUIT):
                 done = True
             elif (event.type == pygame.KEYUP):
-                if (event.key == pygame.K_r):  
-                    black_car.reverse()
-                elif (event.key == pygame.K_UP):  
+                if (event.key == pygame.K_UP):  
                     black_car.accelerate(0.5)
                 elif (event.key == pygame.K_DOWN):  
                     black_car.brake()
@@ -275,18 +267,17 @@ if __name__ == "__main__":
         track_group.draw(window)
         car_group.draw(window)
         finish_group.draw(window)
-        play_level(window, black_car.speed, laps)
 
         # Cast diff rays
-        x, y = cast_ray(black_car.position, wall_pos, black_car.heading, 0)
-        pygame.draw.line(window, (255, 179, 113), [black_car.position[0], black_car.position[1]], [x, y], 5)
+        ray_angles = [0, 70, -70]
+        distances = []
+        for i, angle in enumerate(ray_angles):
+            x, y = cast_ray(black_car.position, wall_pos, black_car.heading, angle)
+            distance_to_wall = math.sqrt((x - black_car.position[0]) ** 2 + (y - black_car.position[1]) ** 2)
+            distances.append(round(distance_to_wall))
+            pygame.draw.line(window, (255, 113, 113), [black_car.position[0], black_car.position[1]], [x, y], 5)
 
-        x, y = cast_ray(black_car.position, wall_pos, black_car.heading, 80)
-        pygame.draw.line(window, (255, 179, 113), [black_car.position[0], black_car.position[1]], [x, y], 5)
-
-        x, y = cast_ray(black_car.position, wall_pos, black_car.heading, -80)
-        pygame.draw.line(window, (255, 179, 113), [black_car.position[0], black_car.position[1]], [x, y], 5)
-
+        play_level(window, distances[0], distances[1], distances[2], black_car.speed, laps)
 
         pygame.display.flip()
         # set fps
