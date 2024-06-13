@@ -1,5 +1,33 @@
+import pygame
+from pygame.sprite import Sprite
+
+"""
+Define classes and functions needed to draw information on the screen
+"""
 
 
+BLUE = (106, 159, 181)
+WHITE = (255, 255, 255)
+
+class UIElement(Sprite):
+    """ An user interface element that can be added to a surface """
+
+    def __init__(self, center_position, text, font_size, bg_rgb, text_rgb, action=None):
+        """
+        Args:
+            center_position - tuple (x, y)
+            text - string of text to write
+            font_size - int
+            bg_rgb (background colour) - tuple (r, g, b)
+            text_rgb (text colour) - tuple (r, g, b)
+            action - the gamestate change associated with this button
+        """
+        self.image = create_surface_with_text(text=text, font_size=font_size, text_rgb=text_rgb, bg_rgb=bg_rgb)
+        self.rect = self.image.get_rect(center=center_position)
+        self.action = action
+
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)
 
 def play_level(screen, sens1, sens2, sens3, speed, laps):
     lap_time = UIElement(
@@ -62,23 +90,3 @@ def create_surface_with_text(text, font_size, text_rgb, bg_rgb):
     font = pygame.freetype.SysFont("Courier", font_size, bold=True)
     surface, _ = font.render(text=text, fgcolor=text_rgb, bgcolor=bg_rgb)
     return surface.convert_alpha()
-
-class UIElement(Sprite):
-    """ An user interface element that can be added to a surface """
-
-    def __init__(self, center_position, text, font_size, bg_rgb, text_rgb, action=None):
-        """
-        Args:
-            center_position - tuple (x, y)
-            text - string of text to write
-            font_size - int
-            bg_rgb (background colour) - tuple (r, g, b)
-            text_rgb (text colour) - tuple (r, g, b)
-            action - the gamestate change associated with this button
-        """
-        self.image = create_surface_with_text(text=text, font_size=font_size, text_rgb=text_rgb, bg_rgb=bg_rgb)
-        self.rect = self.image.get_rect(center=center_position)
-        self.action = action
-
-    def draw(self, surface):
-        surface.blit(self.image, self.rect)
