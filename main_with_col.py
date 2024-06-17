@@ -12,8 +12,8 @@ from utils.ui import play_level
 
 """
 TODO:
-# Clean up ui.py and main
 # Reward function - calc distance on track and timer.
+# Clean car class
 # Be able to spawn multiple cars
 # Smaller car, better track
 # Draw functions maybe that draws everything
@@ -36,27 +36,32 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 
 class Car(Sprite):
-    def __init__(self, car_image, x, y, rotations=360):
-        Sprite.__init__(self)
+    def __init__(self, car_image:str, x: float, y: float):
+        super().__init__()
         self.rot_img   = []
-        self.min_angle = (360 / rotations) 
-        car_image = pygame.image.load(car_image).convert_alpha()
-        for i in range(rotations):
-            rotated_image = pygame.transform.rotozoom(car_image, 360-90-(i*self.min_angle), 1)
-            self.rot_img.append(rotated_image)
+        self.min_angle = 1 
+        self.rot_img = self._load_rotated_images(car_image)
         self.min_angle = math.radians(self.min_angle)
         self.image       = self.rot_img[0]
         self.rect        = self.image.get_rect()
         self.mask = pygame.mask.from_surface(self.image)
-        self.rect.center = (x, y)
+        #self.rect.center = (x, y)
         self.reversing = False
         self.heading   = 0
-        self.speed     = 0    
+        self.speed     = 0 
         self.velocity  = pygame.math.Vector2(0, 0)
         self.position  = pygame.math.Vector2(x, y)
         self.start_pos = (x, y)
 
-    def turn(self, angle_degrees):
+    def _load_rotated_images(self, car_image: str) -> list:
+        car_image = pygame.image.load(car_image).convert_alpha()
+        rotated_images = []
+        for i in range(360):
+            rotated_image = pygame.transform.rotozoom(car_image, 360 - 90 - (i), 1)
+            rotated_images.append(rotated_image)
+        return rotated_images
+
+    def turn(self, angle_degrees) -> None:
         self.heading += math.radians(angle_degrees) 
         image_index = int(self.heading / self.min_angle) % len(self.rot_img)
         if (self.image != self.rot_img[ image_index ]):
@@ -67,25 +72,25 @@ class Car(Sprite):
             # need to update mask or collision will use og image
             self.mask = pygame.mask.from_surface(self.image)
 
-    def accelerate(self, amount):
+    def accelerate(self, amount) -> None:
         # Add more realistic way of accelerating + a normal speed cap
         if self.speed <= 10:
                 self.speed += amount
         else: 
             self.speed -= amount
 
-    def brake(self):
+    def brake(self) -> None:
         # Add more realistic way of breaking
         self.speed /= 2
         if (abs(self.speed) < 0.1):
             self.speed = 0
 
-    def update(self):
+    def update(self) -> None:
         self.velocity.from_polar((self.speed, math.degrees(self.heading)))
         self.position += self.velocity
         self.rect.center = (round(self.position[0]), round(self.position[1]))
 
-    def reset(self):
+    def reset(self) -> None:
         self.image = self.rot_img[0]
         self.position  = pygame.math.Vector2(self.start_pos[0], self.start_pos[1])
         self.velocity  = pygame.math.Vector2(0, 0)
@@ -93,7 +98,7 @@ class Car(Sprite):
 
 # create one superclass i think
 class Level(Sprite):
-    def __init__(self, image, x, y):
+    def __init__(self, image: str, x: int, y: int):
         Sprite.__init__(self)
         self.image = pygame.image.load(image).convert_alpha()
         self.mask = pygame.mask.from_surface(self.image)
@@ -101,15 +106,15 @@ class Level(Sprite):
         self.rect.center = (x, y) 
 # add move to player class maybe?
 
-def move(black_car, keys):
+def move(black_car, keys) -> None:
     if black_car.speed != 0:
-        if (keys[pygame.K_LEFT]):
+        if keys[pygame.K_LEFT]:
             black_car.turn(-1.0)  # degrees
-        if (keys[pygame.K_RIGHT]):
+        if keys[pygame.K_RIGHT]:
             black_car.turn(1.0)
 
 # easy way to get the position of the track walls
-def get_walls(track, width, height):
+def get_walls(track, width, height) -> np.array:
     all_walls = []
     for x in range(0, width):
         line = []

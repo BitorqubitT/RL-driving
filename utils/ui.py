@@ -26,10 +26,12 @@ class UIElement(Sprite):
         self.rect = self.image.get_rect(center=center_position)
         self.action = action
 
-    def draw(self, surface):
+    def draw(self, surface) -> None:
         surface.blit(self.image, self.rect)
 
-def play_level(screen, sens1, sens2, sens3, speed, laps):
+
+def play_level(screen, sens1, sens2, sens3, speed, laps) -> None:
+    """ Function which updates the screen with the UI"""
     lap_time = UIElement(
         center_position=(1840, 60),
         font_size=20,
