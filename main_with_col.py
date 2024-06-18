@@ -12,7 +12,9 @@ from utils.ui import play_level
 
 """
 TODO:
+# Finish enviroment class
 # Reward function - calc distance on track and timer.
+# Create a player class
 # Clean car class
 # Be able to spawn multiple cars
 # Smaller car, better track
@@ -21,7 +23,7 @@ TODO:
 # Clean code + PEP8
 # Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
 # USE NEAT (need different setup)
-# USE DQN 
+# USE DQN with img as input and only sensors 
 # Faster time
 """
 
@@ -136,6 +138,25 @@ def cast_ray(car_pos, arr, heading, angle_offset):
         y = round(car_pos[1] + math.sin(heading) * i)
         if arr[x, y]:
             return x, y
+
+class Environment():
+    """load and update the game, take in actions, keep score"""
+    def __init__(self):
+        pygame.init()
+        self.fps = 120
+        self.width, self.height = 1920, 1080
+        self.window = 
+        self.action_space = None
+        self.observation_space = None
+        self.reward = 0
+
+    def reset() -> None:
+
+    """Do we need step?"""
+    def step(self):
+
+    def render(self) -> None:
+
 
 if __name__ == "__main__":
     pygame.init()
