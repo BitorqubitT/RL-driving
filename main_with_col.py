@@ -63,7 +63,7 @@ class Car(Sprite):
             rotated_images.append(rotated_image)
         return rotated_images
 
-    def turn(self, angle_degrees) -> None:
+    def _turn(self, angle_degrees) -> None:
         self.heading += math.radians(angle_degrees) 
         image_index = int(self.heading / self.min_angle) % len(self.rot_img)
         if (self.image != self.rot_img[ image_index ]):
@@ -74,28 +74,47 @@ class Car(Sprite):
             # need to update mask or collision will use og image
             self.mask = pygame.mask.from_surface(self.image)
 
-    def accelerate(self, amount) -> None:
+    def _accelerate(self, amount) -> None:
         # Add more realistic way of accelerating + a normal speed cap
         if self.speed <= 10:
                 self.speed += amount
         else: 
             self.speed -= amount
 
-    def brake(self) -> None:
+    def _brake(self) -> None:
         # Add more realistic way of breaking
         self.speed /= 2
         if (abs(self.speed) < 0.1):
             self.speed = 0
+
+    def _cast_ray(self) -> None:
+        # Maybe cast rays from the car
+        # Just give the walls.
+        # Keep data in car
+        return None
 
     def update(self) -> None:
         self.velocity.from_polar((self.speed, math.degrees(self.heading)))
         self.position += self.velocity
         self.rect.center = (round(self.position[0]), round(self.position[1]))
 
+    # Maybe remove this?
     def reset(self) -> None:
         self.image = self.rot_img[0]
         self.position  = pygame.math.Vector2(self.start_pos[0], self.start_pos[1])
         self.velocity  = pygame.math.Vector2(0, 0)
+
+    def action(self, input) -> None:
+        #keys = pygame.key.get_pressed()
+        if (event.key == pygame.K_UP):  
+            self._accelerate(0.5)
+        elif (event.key == pygame.K_DOWN):  
+            self._brake()
+        elif (event.key == pygame.K_LEFT):
+            self._turn(-1.0)
+        elif (event.key == pygame.K_RIGHT):
+            self._turn(1.0)
+        
 
 
 # create one superclass i think
@@ -107,13 +126,6 @@ class Level(Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = (x, y) 
 # add move to player class maybe?
-
-def move(black_car, keys) -> None:
-    if black_car.speed != 0:
-        if keys[pygame.K_LEFT]:
-            black_car.turn(-1.0)  # degrees
-        if keys[pygame.K_RIGHT]:
-            black_car.turn(1.0)
 
 # easy way to get the position of the track walls
 def get_walls(track, width, height) -> np.array:
@@ -145,52 +157,62 @@ class Environment():
         pygame.init()
         self.fps = 120
         self.width, self.height = 1920, 1080
-        self.window = 
+        pygame.display.set_caption("Car sim :)")
+        self.window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_SURFACE)
+        self.background = pygame.image.load("assets/background2.png")
+        self.track = Level("assets/track 2.png", WINDOW_WIDTH//2, WINDOW_HEIGHT//2)
+        self.finish = Level("assets/finish2.png", 870, 100)
         self.action_space = None
         self.observation_space = None
         self.reward = 0
+        self.car_group = pygame.sprite.Group()
+        self.track_group = pygame.sprite.Group()
+        self.finish_group = pygame.sprite.Group()
+        self.car_group.add(self.car_group)
+        self.track_group.add(self.track)
+        self.finish_group.add(self.finish)
+        self.wall_pos = _load_walls()
+        # other way of doing this
 
-    def reset() -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        # Do we want to reset the environment?
+        laps = 0
+
+        self.car = Car("assets/car1.png", 950, 100)
+
+        if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
+            self.car.reset()
+        if pygame.sprite.spritecollide(self.finish, self.car_group, False, pygame.sprite.collide_mask):
+            laps += 1
+
 
     """Do we need step?"""
-    def step(self):
+    def step(self, action):
+
+        return None
+        # Check collision:
 
     def render(self) -> None:
+        return None
+
+    def load_obstacles() -> None:
+        return None
+    
+    def _load_finish(self) -> list:
+        return []
+
+
+
 
 
 if __name__ == "__main__":
-    pygame.init()
-    window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_SURFACE)
-    pygame.display.set_caption("Car sim :)")
-
-    ### Bitmaps
-    black_car = Car("assets/car1.png", 950, 100)
-    background = pygame.image.load("assets/background2.png")
-    track = Level("assets/track 2.png", WINDOW_WIDTH//2, WINDOW_HEIGHT//2)
-    finish = Level("assets/finish2.png", 870, 100)
-
-    car_group = pygame.sprite.Group()
-    track_group = pygame.sprite.Group()
-    finish_group = pygame.sprite.Group()
-
-    #add instances to groups
-    car_group.add(black_car)
-    track_group.add(track)
-    finish_group.add(finish)
 
     clock = pygame.time.Clock()
-    done = False
-    laps = 0
 
-    # Get wall position (lazy way)
-    wall_pos = get_walls(track.mask, WINDOW_WIDTH, WINDOW_HEIGHT)
 
     while not done:
-
-        if pygame.sprite.spritecollide(track, car_group, False, pygame.sprite.collide_mask):
-            black_car.reset()
-        if pygame.sprite.spritecollide(finish, car_group, False, pygame.sprite.collide_mask):
-            laps += 1
 
         for event in pygame.event.get():
             if (event.type == pygame.QUIT):
