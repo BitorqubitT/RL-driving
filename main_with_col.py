@@ -1,20 +1,17 @@
-import pygame
 import math
-import pygame_gui
 import pygame
 import pygame.freetype
 from pygame.sprite import Sprite
-from pygame.rect import Rect
-from enum import Enum
-from pygame.sprite import RenderUpdates
 import numpy as np
 from utils.ui import play_level
 
 """
 TODO:
+# Seems kinda laggy
 # Finish enviroment class
 # Reward function - calc distance on track and timer.
-# Create a player class
+# Create a player class, do we need this?
+# Do we destroy car obect when crashing?
 # Clean car class
 # Be able to spawn multiple cars
 # Smaller car, better track
@@ -77,7 +74,7 @@ class Car(Sprite):
     def _accelerate(self, amount) -> None:
         # Add more realistic way of accelerating + a normal speed cap
         if self.speed <= 10:
-                self.speed += amount
+            self.speed += amount
         else: 
             self.speed -= amount
 
@@ -87,11 +84,25 @@ class Car(Sprite):
         if (abs(self.speed) < 0.1):
             self.speed = 0
 
-    def _cast_ray(self) -> None:
-        # Maybe cast rays from the car
-        # Just give the walls.
-        # Keep data in car
-        return None
+    def _cast_ray(self, arr, angle_offset) -> None:
+        x, y = 0, 0
+        heading = self.heading + angle_offset
+        for i in range(0, 800):
+            x = round(self.position[0] + math.cos(heading) * i)
+            y = round(self.position[1] + math.sin(heading) * i)
+            if arr[x, y]:
+                return x, y
+
+    def distance_to_walls(self, walls) -> list:    
+        ray_angles = [0, 70, -70]
+        distances = []
+        all_position = []
+        for i, angle in enumerate(ray_angles):
+            x, y = self._cast_ray(walls, angle)
+            all_position.append((x, y))
+            distance_to_wall = math.sqrt((x - self.position[0]) ** 2 + (y - self.position[1]) ** 2)
+            distances.append(round(distance_to_wall))
+        return all_position, distances
 
     def update(self) -> None:
         self.velocity.from_polar((self.speed, math.degrees(self.heading)))
@@ -105,16 +116,15 @@ class Car(Sprite):
         self.velocity  = pygame.math.Vector2(0, 0)
 
     def action(self, input) -> None:
-        #keys = pygame.key.get_pressed()
-        if (event.key == pygame.K_UP):  
+        if input[pygame.K_UP]:
             self._accelerate(0.5)
-        elif (event.key == pygame.K_DOWN):  
+        elif input[pygame.K_DOWN]:
             self._brake()
-        elif (event.key == pygame.K_LEFT):
-            self._turn(-1.0)
-        elif (event.key == pygame.K_RIGHT):
-            self._turn(1.0)
-        
+        if self.speed != 0:
+            if input[pygame.K_LEFT]:
+                self._turn(-1.0)
+            elif input[pygame.K_RIGHT]:
+                self._turn(1.0)
 
 
 # create one superclass i think
@@ -141,15 +151,6 @@ def get_walls(track, width, height) -> np.array:
     wall_pos = np.array([np.array(x) for x in all_walls])
     return wall_pos
 
-# We actually want the distance at some point
-def cast_ray(car_pos, arr, heading, angle_offset):
-    x, y = 0, 0
-    heading = heading + angle_offset
-    for i in range(0, 800):
-        x = round(car_pos[0] + math.cos(heading) * i)
-        y = round(car_pos[1] + math.sin(heading) * i)
-        if arr[x, y]:
-            return x, y
 
 class Environment():
     """load and update the game, take in actions, keep score"""
@@ -168,36 +169,52 @@ class Environment():
         self.car_group = pygame.sprite.Group()
         self.track_group = pygame.sprite.Group()
         self.finish_group = pygame.sprite.Group()
-        self.car_group.add(self.car_group)
         self.track_group.add(self.track)
         self.finish_group.add(self.finish)
-        self.wall_pos = _load_walls()
+        self.walls = get_walls(self.track.mask, self.width, self.height)
         # other way of doing this
-
         self.reset()
 
     def reset(self) -> None:
         # Do we want to reset the environment?
         laps = 0
-
         self.car = Car("assets/car1.png", 950, 100)
-
-        if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
-            self.car.reset()
+        self.car_group.add(self.car)
         if pygame.sprite.spritecollide(self.finish, self.car_group, False, pygame.sprite.collide_mask):
             laps += 1
 
-
     """Do we need step?"""
-    def step(self, action):
+    def step(self) -> None:
 
+        # should put stuff in step
+        # and put render in step
+        # without a loop i guess
+        return
+        
+    def render(self, keys) -> None:
+
+        clock = pygame.time.Clock()
+        if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
+           self.car.reset()
+        self.car.distance_to_walls(self.walls)
+        self.car.action(keys)
+        self.window.blit(self.background, (0, 0))
+        self.car_group.update()
+        self.track_group.draw(self.window)
+        self.car_group.draw(self.window)
+        self.finish_group.draw(self.window)
+
+        positions, distances = self.car.distance_to_walls(self.walls)
+        for i in positions:
+            pygame.draw.line(self.window, (255, 113, 113), [self.car.position[0], self.car.position[1]], [i[0], i[1]], 5)
+
+        play_level(self.window, distances[0], distances[1], distances[2], self.car.speed, 1)
+
+        pygame.display.flip()
+        clock.tick_busy_loop(60)
         return None
-        # Check collision:
 
-    def render(self) -> None:
-        return None
-
-    def load_obstacles() -> None:
+    def _load_obstacles(self) -> None:
         return None
     
     def _load_finish(self) -> list:
@@ -205,48 +222,20 @@ class Environment():
 
 
 
-
-
 if __name__ == "__main__":
 
-    clock = pygame.time.Clock()
+    current_game = True
 
-
-    while not done:
+    x = Environment()
+    x.reset()
+    
+    while current_game:
 
         for event in pygame.event.get():
             if (event.type == pygame.QUIT):
-                done = True
-            elif (event.type == pygame.KEYUP):
-                if (event.key == pygame.K_UP):  
-                    black_car.accelerate(0.5)
-                elif (event.key == pygame.K_DOWN):  
-                    black_car.brake()
-        
+                current_game = False       
         keys = pygame.key.get_pressed()
-        move(black_car, keys)
-
-        window.blit(background, (0, 0))
-        car_group.update()
-        track_group.draw(window)
-        car_group.draw(window)
-        finish_group.draw(window)
-
-        # Cast diff rays
-        ray_angles = [0, 70, -70]
-        distances = []
-        for i, angle in enumerate(ray_angles):
-            x, y = cast_ray(black_car.position, wall_pos, black_car.heading, angle)
-            distance_to_wall = math.sqrt((x - black_car.position[0]) ** 2 + (y - black_car.position[1]) ** 2)
-            distances.append(round(distance_to_wall))
-            pygame.draw.line(window, (255, 113, 113), [black_car.position[0], black_car.position[1]], [x, y], 5)
-
-        play_level(window, distances[0], distances[1], distances[2], black_car.speed, laps)
-
-        pygame.display.flip()
-        # set fps
-        clock.tick_busy_loop(60)
-
-    pygame.quit()
-
-
+        x.render(keys)
+    
+    
+    
