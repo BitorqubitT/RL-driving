@@ -75,8 +75,6 @@ class Car(Sprite):
         # Add more realistic way of accelerating + a normal speed cap
         if self.speed <= 10:
             self.speed += amount
-        else: 
-            self.speed -= amount
 
     def _brake(self) -> None:
         # Add more realistic way of breaking
@@ -116,8 +114,10 @@ class Car(Sprite):
         self.velocity  = pygame.math.Vector2(0, 0)
 
     def action(self, input) -> None:
+        # maybe dont use hold
         if input[pygame.K_UP]:
-            self._accelerate(0.5)
+            self._accelerate(0.1)
+            print("we get jere")
         elif input[pygame.K_DOWN]:
             self._brake()
         if self.speed != 0:
@@ -184,26 +184,30 @@ class Environment():
             laps += 1
 
     """Do we need step?"""
-    def step(self) -> None:
+    def step(self, keys) -> None:
 
         # should put stuff in step
         # and put render in step
         # without a loop i guess
-        return
+        print("steps goes brrrrrrrrrrrrrrrrr")
+        if keys is not None:
+            self.car.action(keys)
+        self.render()
+        # actoin should be in car 
+        return None
         
-    def render(self, keys) -> None:
-
+    def render(self) -> None:
+        print("render goes brrrrrrrrrrrrrrrrr")
         clock = pygame.time.Clock()
         if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
            self.car.reset()
         self.car.distance_to_walls(self.walls)
-        self.car.action(keys)
         self.window.blit(self.background, (0, 0))
         self.car_group.update()
         self.track_group.draw(self.window)
         self.car_group.draw(self.window)
         self.finish_group.draw(self.window)
-
+        #self.car.action(keys)
         positions, distances = self.car.distance_to_walls(self.walls)
         for i in positions:
             pygame.draw.line(self.window, (255, 113, 113), [self.car.position[0], self.car.position[1]], [i[0], i[1]], 5)
@@ -230,12 +234,15 @@ if __name__ == "__main__":
     x.reset()
     
     while current_game:
-
+        keys = None
         for event in pygame.event.get():
             if (event.type == pygame.QUIT):
-                current_game = False       
-        keys = pygame.key.get_pressed()
-        x.render(keys)
+                current_game = False      
+            elif (event.type == pygame.KEYUP):
+                print("got key")
+                keys = pygame.key.get_pressed()
+        print("we hawt")
+        x.step(keys)
     
     
     
