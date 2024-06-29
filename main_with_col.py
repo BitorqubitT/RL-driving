@@ -7,20 +7,15 @@ from utils.ui import play_level
 
 """
 TODO:
-# Seems kinda laggy
-# Finish enviroment class
+# Implement a training loop for rl and in whic function
+# Check how to use the environment class
 # Reward function - calc distance on track and timer.
-# Create a player class, do we need this?
-# Do we destroy car obect when crashing?
-# Clean car class
-# Be able to spawn multiple cars
 # Smaller car, better track
-# Draw functions maybe that draws everything
 # Make sure its easy to change levels
 # Clean code + PEP8
 # Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
-# USE NEAT (need different setup)
 # USE DQN with img as input and only sensors 
+
 # Faster time
 """
 
@@ -113,19 +108,18 @@ class Car(Sprite):
         self.position  = pygame.math.Vector2(self.start_pos[0], self.start_pos[1])
         self.velocity  = pygame.math.Vector2(0, 0)
 
-    def action(self, input) -> None:
-        # maybe dont use hold
-        if input[pygame.K_UP]:
+    def action(self, keys) -> None:
+        # change this functiono depending on player or pc?
+        # if pc just give int value between 1->8 actions?  
+        if keys[pygame.K_UP]:
             self._accelerate(0.1)
-            print("we get jere")
-        elif input[pygame.K_DOWN]:
+        if keys[pygame.K_DOWN]:
             self._brake()
         if self.speed != 0:
-            if input[pygame.K_LEFT]:
-                self._turn(-1.0)
-            elif input[pygame.K_RIGHT]:
+            if keys[pygame.K_RIGHT]:
                 self._turn(1.0)
-
+            if keys[pygame.K_LEFT]:
+                self._turn(-1.0)
 
 # create one superclass i think
 class Level(Sprite):
@@ -156,7 +150,6 @@ class Environment():
     """load and update the game, take in actions, keep score"""
     def __init__(self):
         pygame.init()
-        self.fps = 120
         self.width, self.height = 1920, 1080
         pygame.display.set_caption("Car sim :)")
         self.window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_SURFACE)
@@ -172,6 +165,8 @@ class Environment():
         self.track_group.add(self.track)
         self.finish_group.add(self.finish)
         self.walls = get_walls(self.track.mask, self.width, self.height)
+        clock = pygame.time.Clock()
+        clock.tick_busy_loop(60)
         # other way of doing this
         self.reset()
 
@@ -182,25 +177,20 @@ class Environment():
         self.car_group.add(self.car)
         if pygame.sprite.spritecollide(self.finish, self.car_group, False, pygame.sprite.collide_mask):
             laps += 1
+            self.car.reset()
 
-    """Do we need step?"""
     def step(self, keys) -> None:
-
-        # should put stuff in step
-        # and put render in step
-        # without a loop i guess
-        print("steps goes brrrrrrrrrrrrrrrrr")
-        if keys is not None:
-            self.car.action(keys)
+        self.car.action(keys)
         self.render()
+
+        # Calculate reward
+
+
         # actoin should be in car 
         return None
         
     def render(self) -> None:
-        print("render goes brrrrrrrrrrrrrrrrr")
-        clock = pygame.time.Clock()
-        if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
-           self.car.reset()
+        #TODO: This shouldnt be here, maybe in step, or check collision class?
         self.car.distance_to_walls(self.walls)
         self.window.blit(self.background, (0, 0))
         self.car_group.update()
@@ -211,11 +201,8 @@ class Environment():
         positions, distances = self.car.distance_to_walls(self.walls)
         for i in positions:
             pygame.draw.line(self.window, (255, 113, 113), [self.car.position[0], self.car.position[1]], [i[0], i[1]], 5)
-
         play_level(self.window, distances[0], distances[1], distances[2], self.car.speed, 1)
-
         pygame.display.flip()
-        clock.tick_busy_loop(60)
         return None
 
     def _load_obstacles(self) -> None:
@@ -234,14 +221,17 @@ if __name__ == "__main__":
     x.reset()
     
     while current_game:
-        keys = None
         for event in pygame.event.get():
             if (event.type == pygame.QUIT):
-                current_game = False      
-            elif (event.type == pygame.KEYUP):
-                print("got key")
-                keys = pygame.key.get_pressed()
-        print("we hawt")
+                current_game = False     
+            # Will change this into action for the bot 
+
+
+        # This is where the agent while give an action
+        # After action we calculate reward in the enviroment
+        keys = pygame.key.get_pressed()
+
+
         x.step(keys)
     
     
