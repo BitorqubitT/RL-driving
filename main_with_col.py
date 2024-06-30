@@ -7,6 +7,7 @@ from utils.ui import play_level
 
 """
 TODO:
+# Finish refactoring the envirnoment init()
 # Implement a training loop for rl and in whic function
 # Check how to use the environment class
 # Reward function - calc distance on track and timer.
@@ -14,8 +15,12 @@ TODO:
 # Make sure its easy to change levels
 # Clean code + PEP8
 # Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
-# USE DQN with img as input and only sensors 
-
+# USE DQN with img as input and only sensors
+# 
+# 
+# How do we deal with being able to replay
+# While training we dont have to draw anything 
+# Maybe a PARAM if human or ai is playing
 # Faster time
 """
 
@@ -154,16 +159,13 @@ class Environment():
         pygame.display.set_caption("Car sim :)")
         self.window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_SURFACE)
         self.background = pygame.image.load("assets/background2.png")
-        self.track = Level("assets/track 2.png", WINDOW_WIDTH//2, WINDOW_HEIGHT//2)
-        self.finish = Level("assets/finish2.png", 870, 100)
         self.action_space = None
         self.observation_space = None
         self.reward = 0
         self.car_group = pygame.sprite.Group()
-        self.track_group = pygame.sprite.Group()
-        self.finish_group = pygame.sprite.Group()
-        self.track_group.add(self.track)
-        self.finish_group.add(self.finish)
+        self.track_group = self._load_obstacles()
+        self.finish_group = self._load_finish()
+        self.checkpoint_group = pygame.sprite.Group()
         self.walls = get_walls(self.track.mask, self.width, self.height)
         clock = pygame.time.Clock()
         clock.tick_busy_loop(60)
@@ -177,7 +179,6 @@ class Environment():
         self.car_group.add(self.car)
         if pygame.sprite.spritecollide(self.finish, self.car_group, False, pygame.sprite.collide_mask):
             laps += 1
-            self.car.reset()
 
     def step(self, keys) -> None:
         self.car.action(keys)
@@ -185,19 +186,18 @@ class Environment():
 
         # Calculate reward
 
+        if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
+           self.car.reset()
 
-        # actoin should be in car 
         return None
         
     def render(self) -> None:
-        #TODO: This shouldnt be here, maybe in step, or check collision class?
         self.car.distance_to_walls(self.walls)
         self.window.blit(self.background, (0, 0))
         self.car_group.update()
         self.track_group.draw(self.window)
         self.car_group.draw(self.window)
         self.finish_group.draw(self.window)
-        #self.car.action(keys)
         positions, distances = self.car.distance_to_walls(self.walls)
         for i in positions:
             pygame.draw.line(self.window, (255, 113, 113), [self.car.position[0], self.car.position[1]], [i[0], i[1]], 5)
@@ -205,11 +205,21 @@ class Environment():
         pygame.display.flip()
         return None
 
+    # What is returned?
     def _load_obstacles(self) -> None:
-        return None
+        self.track = Level("assets/track 2.png", WINDOW_WIDTH//2, WINDOW_HEIGHT//2)
+        self.track_group = pygame.sprite.Group()
+        self.track_group.add(self.track)
+        return self.track_group
     
     def _load_finish(self) -> list:
-        return []
+        self.finish = Level("assets/finish2.png", 870, 100)
+        self.finish_group = pygame.sprite.Group()
+        self.finish_group.add(self.finish)
+        return self.finish_group
+    
+    def _load_checkpoints(self) -> list:
+        return None
 
 
 
@@ -221,6 +231,11 @@ if __name__ == "__main__":
     x.reset()
     
     while current_game:
+
+        # We want to train for n episodes
+        # But we should reset the game state etc when we crash into a wall
+        # Also how do we capture rewards for replay?
+
         for event in pygame.event.get():
             if (event.type == pygame.QUIT):
                 current_game = False     
@@ -232,7 +247,8 @@ if __name__ == "__main__":
         keys = pygame.key.get_pressed()
 
 
+        # step should return some stuff about the score of the game
         x.step(keys)
-    
+
     
     
