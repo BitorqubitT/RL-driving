@@ -136,21 +136,6 @@ class Level(Sprite):
         self.rect.center = (x, y) 
 # add move to player class maybe?
 
-# easy way to get the position of the track walls
-def get_walls(track, width, height) -> np.array:
-    all_walls = []
-    for x in range(0, width):
-        line = []
-        for j in range(0, height):
-            if track.get_at((x, j)):
-                line.append(True)
-            else:
-                line.append(False)
-        all_walls.append(line)
-    wall_pos = np.array([np.array(x) for x in all_walls])
-    return wall_pos
-
-
 class Environment():
     """load and update the game, take in actions, keep score"""
     def __init__(self):
@@ -165,8 +150,8 @@ class Environment():
         self.car_group = pygame.sprite.Group()
         self.track_group = self._load_obstacles()
         self.finish_group = self._load_finish()
-        self.checkpoint_group = pygame.sprite.Group()
-        self.walls = get_walls(self.track.mask, self.width, self.height)
+        self.checkpoint_group = self._load_checkpoints()
+        self.walls = self._get_walls(self.track.mask, self.width, self.height)
         clock = pygame.time.Clock()
         clock.tick_busy_loop(60)
         # other way of doing this
@@ -198,6 +183,7 @@ class Environment():
         self.track_group.draw(self.window)
         self.car_group.draw(self.window)
         self.finish_group.draw(self.window)
+        self.checkpoint_group.draw(self.window)
         positions, distances = self.car.distance_to_walls(self.walls)
         for i in positions:
             pygame.draw.line(self.window, (255, 113, 113), [self.car.position[0], self.car.position[1]], [i[0], i[1]], 5)
@@ -219,8 +205,40 @@ class Environment():
         return self.finish_group
     
     def _load_checkpoints(self) -> list:
-        return None
+        # Think this is overkill for checkpoints
+        # Cant i just set them manually, and calculate the distance from the car
+        # If reached then we good
+        # Just make a list and draw at this position to check
+        checkpoint_coordinates = [(970, 100),
+                                  (1070, 100),
+                                  (1170, 130),
+                                  (1270, 140),
+                                  (1370, 140),
+                                  (1470, 150),
+                                  (1570, 160),
+                                  (1670, 170),
+                                  (1270, 140)
+                                  ]
+        
+        self.checkpoint_group = pygame.sprite.Group()
+        for i in checkpoint_coordinates:
+            self.checkpoint = Level("assets/finish2.png", i[0], i[1])
+            self.checkpoint_group.add(self.checkpoint) 
+        return self.checkpoint_group
 
+    # easy way to get the position of the track walls
+    def _get_walls(self, track, width, height) -> np.array:
+        all_walls = []
+        for x in range(0, width):
+            line = []
+            for j in range(0, height):
+                if track.get_at((x, j)):
+                    line.append(True)
+                else:
+                    line.append(False)
+            all_walls.append(line)
+        wall_pos = np.array([np.array(x) for x in all_walls])
+        return wall_pos
 
 
 if __name__ == "__main__":
@@ -244,6 +262,7 @@ if __name__ == "__main__":
 
         # This is where the agent while give an action
         # After action we calculate reward in the enviroment
+        # if player == "human"
         keys = pygame.key.get_pressed()
 
 
