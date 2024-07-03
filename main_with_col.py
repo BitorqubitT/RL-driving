@@ -7,21 +7,18 @@ from utils.ui import play_level
 
 """
 TODO:
-# Finish refactoring the envirnoment init()
-# Implement a training loop for rl and in whic function
-# Check how to use the environment class
-# Reward function - calc distance on track and timer.
+# Fix check distance for checkpoints
+# Implement a training loop for rl
+# Store results (list of actions, sensor data?)
+# Set a param to toggle render or non render mode (research this)
+# Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
+# Use DQN with img or sensors data (setup both)
+
+Low prio:
 # Smaller car, better track
 # Make sure its easy to change levels
 # Clean code + PEP8
-# Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
-# USE DQN with img as input and only sensors
-# 
-# 
-# How do we deal with being able to replay
-# While training we dont have to draw anything 
-# Maybe a PARAM if human or ai is playing
-# Faster time
+# Faster time training
 """
 
 # Window size
@@ -150,8 +147,8 @@ class Environment():
         self.car_group = pygame.sprite.Group()
         self.track_group = self._load_obstacles()
         self.finish_group = self._load_finish()
-        self.checkpoint_group = self._load_checkpoints()
         self.walls = self._get_walls(self.track.mask, self.width, self.height)
+        self.checkpoints = self._set_checkpoints()
         clock = pygame.time.Clock()
         clock.tick_busy_loop(60)
         # other way of doing this
@@ -168,8 +165,10 @@ class Environment():
     def step(self, keys) -> None:
         self.car.action(keys)
         self.render()
-
         # Calculate reward
+        if self._check_checkpoint():
+            print("got oneeeeeeeeeeee")
+            self.reward += 1
 
         if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
            self.car.reset()
@@ -183,11 +182,10 @@ class Environment():
         self.track_group.draw(self.window)
         self.car_group.draw(self.window)
         self.finish_group.draw(self.window)
-        self.checkpoint_group.draw(self.window)
         positions, distances = self.car.distance_to_walls(self.walls)
         for i in positions:
             pygame.draw.line(self.window, (255, 113, 113), [self.car.position[0], self.car.position[1]], [i[0], i[1]], 5)
-        play_level(self.window, distances[0], distances[1], distances[2], self.car.speed, 1)
+        play_level(self.window, distances[0], distances[1], distances[2], self.car.speed, 1, self.reward)
         pygame.display.flip()
         return None
 
@@ -204,27 +202,30 @@ class Environment():
         self.finish_group.add(self.finish)
         return self.finish_group
     
-    def _load_checkpoints(self) -> list:
-        # Think this is overkill for checkpoints
-        # Cant i just set them manually, and calculate the distance from the car
-        # If reached then we good
+    def _set_checkpoints(self) -> list:
         # Just make a list and draw at this position to check
-        checkpoint_coordinates = [(970, 100),
-                                  (1070, 100),
-                                  (1170, 130),
-                                  (1270, 140),
-                                  (1370, 140),
-                                  (1470, 150),
-                                  (1570, 160),
-                                  (1670, 170),
-                                  (1270, 140)
-                                  ]
-        
-        self.checkpoint_group = pygame.sprite.Group()
-        for i in checkpoint_coordinates:
-            self.checkpoint = Level("assets/finish2.png", i[0], i[1])
-            self.checkpoint_group.add(self.checkpoint) 
-        return self.checkpoint_group
+        checkpoints = [(1170, 100),
+                    (1470, 180),
+                    (1670, 340),
+                    (1800, 600),
+                    (1470, 900),
+                    (1170, 980),
+                    (800, 940),
+                    (440, 880),
+                    (150, 580),
+                    (270, 280),
+                    (500, 150)
+                    ]
+        return checkpoints
+    
+    def _check_checkpoint(self) -> bool:
+        print(self.car.position, self.checkpoints[0])
+        print(math.dist(self.car.position, self.checkpoints[0]))
+
+        if math.dist(self.car.position, self.checkpoints[0]) <= 30.0:
+            self.checkpoints = self.checkpoints[1:]
+            return True
+        return False
 
     # easy way to get the position of the track walls
     def _get_walls(self, track, width, height) -> np.array:
@@ -239,7 +240,6 @@ class Environment():
             all_walls.append(line)
         wall_pos = np.array([np.array(x) for x in all_walls])
         return wall_pos
-
 
 if __name__ == "__main__":
 
