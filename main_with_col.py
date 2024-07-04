@@ -7,18 +7,25 @@ from utils.ui import play_level
 
 """
 TODO:
-# Fix check distance for checkpoints
 # Implement a training loop for rl
 # Store results (list of actions, sensor data?)
 # Set a param to toggle render or non render mode (research this)
 # Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
 # Use DQN with img or sensors data (setup both)
 
+# Might need to seperate rendering from everything.
+# This way I can run render or renderless mode, faster training
+# Will need to get rid of a lot of pygame functions since they wont work
+# Will use raytracing for wall detection
+# This might not be viable if i train on image.
+
+
 Low prio:
 # Smaller car, better track
 # Make sure its easy to change levels
 # Clean code + PEP8
 # Faster time training
+# private _ or __
 """
 
 # Window size
@@ -32,22 +39,22 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 
 class Car(Sprite):
-    def __init__(self, car_image:str, x: float, y: float):
+
+    def __init__(self, car_image:str, x: float, y: float, player_human = True):
         super().__init__()
-        self.rot_img   = []
-        self.min_angle = 1 
+        #TODO: clean this angle stuff
         self.rot_img = self._load_rotated_images(car_image)
-        self.min_angle = math.radians(self.min_angle)
+        self.min_angle = math.radians(1)
         self.image       = self.rot_img[0]
         self.rect        = self.image.get_rect()
         self.mask = pygame.mask.from_surface(self.image)
-        #self.rect.center = (x, y)
+        self.start_pos = (x, y)
         self.reversing = False
         self.heading   = 0
         self.speed     = 0 
         self.velocity  = pygame.math.Vector2(0, 0)
         self.position  = pygame.math.Vector2(x, y)
-        self.start_pos = (x, y)
+        self.player_type = player_human
 
     def _load_rotated_images(self, car_image: str) -> list:
         car_image = pygame.image.load(car_image).convert_alpha()
@@ -98,13 +105,18 @@ class Car(Sprite):
             distance_to_wall = math.sqrt((x - self.position[0]) ** 2 + (y - self.position[1]) ** 2)
             distances.append(round(distance_to_wall))
         return all_position, distances
+    
+    def check_checkpoint(self, checkpoints) -> bool:
+        if math.dist(self.position, checkpoints[0]) <= 70.0:
+            return True
+        return False
 
     def update(self) -> None:
         self.velocity.from_polar((self.speed, math.degrees(self.heading)))
         self.position += self.velocity
         self.rect.center = (round(self.position[0]), round(self.position[1]))
 
-    # Maybe remove this?
+    # Maybe remove this, because we restart the environment?
     def reset(self) -> None:
         self.image = self.rot_img[0]
         self.position  = pygame.math.Vector2(self.start_pos[0], self.start_pos[1])
@@ -112,16 +124,41 @@ class Car(Sprite):
 
     def action(self, keys) -> None:
         # change this functiono depending on player or pc?
-        # if pc just give int value between 1->8 actions?  
-        if keys[pygame.K_UP]:
-            self._accelerate(0.1)
-        if keys[pygame.K_DOWN]:
-            self._brake()
-        if self.speed != 0:
-            if keys[pygame.K_RIGHT]:
+        # if pc just give int value between 1->8 actions?
+        if self.player_type:
+            if keys[pygame.K_UP]:
+                self._accelerate(0.1)
+            if keys[pygame.K_DOWN]:
+                self._brake()
+            if self.speed != 0:
+                if keys[pygame.K_RIGHT]:
+                    self._turn(1.0)
+                if keys[pygame.K_LEFT]:
+                    self._turn(-1.0)
+        else:
+            if keys == 0:
+                pass
+            elif keys == 1:
+                self._accelerate(0.1)
+            elif keys == 8:
+                self._accelerate(0.1)
                 self._turn(1.0)
-            if keys[pygame.K_LEFT]:
+            elif keys == 7:
+                self._accelerate(0.1)
                 self._turn(-1.0)
+            elif keys == 4:
+                self._accelerate(-0.1)
+            elif keys == 5:
+                self._accelerate(-0.1)
+                self._turn(1.0)
+            elif keys == 6:
+                self._accelerate(0.1)
+                self._turn(-1.0)
+            elif keys == 3:
+                self._turn(1.0)
+            elif keys == 2:
+                self._turn(-1.0)
+            pass
 
 # create one superclass i think
 class Level(Sprite):
@@ -140,14 +177,16 @@ class Environment():
         self.width, self.height = 1920, 1080
         pygame.display.set_caption("Car sim :)")
         self.window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_SURFACE)
+        #TODO: Which ones should be private
         self.background = pygame.image.load("assets/background2.png")
         self.action_space = None
         self.observation_space = None
         self.reward = 0
+        self.history = []
         self.car_group = pygame.sprite.Group()
         self.track_group = self._load_obstacles()
         self.finish_group = self._load_finish()
-        self.walls = self._get_walls(self.track.mask, self.width, self.height)
+        self.walls = self._get_walls(self.track.mask)
         self.checkpoints = self._set_checkpoints()
         clock = pygame.time.Clock()
         clock.tick_busy_loop(60)
@@ -157,22 +196,22 @@ class Environment():
     def reset(self) -> None:
         # Do we want to reset the environment?
         laps = 0
-        self.car = Car("assets/car1.png", 950, 100)
+        print("how much do we run this")
+        self.car = Car("assets/car1.png", 950, 100, True)
         self.car_group.add(self.car)
         if pygame.sprite.spritecollide(self.finish, self.car_group, False, pygame.sprite.collide_mask):
             laps += 1
 
     def step(self, keys) -> None:
         self.car.action(keys)
+        self.history.append(self.car.position)
         self.render()
         # Calculate reward
-        if self._check_checkpoint():
-            print("got oneeeeeeeeeeee")
+        if self.car.check_checkpoint(self.checkpoints):
             self.reward += 1
-
+            self.checkpoints.pop(0)
         if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
            self.car.reset()
-
         return None
         
     def render(self) -> None:
@@ -217,22 +256,13 @@ class Environment():
                     (500, 150)
                     ]
         return checkpoints
-    
-    def _check_checkpoint(self) -> bool:
-        print(self.car.position, self.checkpoints[0])
-        print(math.dist(self.car.position, self.checkpoints[0]))
-
-        if math.dist(self.car.position, self.checkpoints[0]) <= 30.0:
-            self.checkpoints = self.checkpoints[1:]
-            return True
-        return False
 
     # easy way to get the position of the track walls
-    def _get_walls(self, track, width, height) -> np.array:
+    def _get_walls(self, track) -> np.array:
         all_walls = []
-        for x in range(0, width):
+        for x in range(0, self.width):
             line = []
-            for j in range(0, height):
+            for j in range(0, self.height):
                 if track.get_at((x, j)):
                     line.append(True)
                 else:
@@ -243,10 +273,12 @@ class Environment():
 
 if __name__ == "__main__":
 
+
+    all_replays = []
+
     current_game = True
 
     x = Environment()
-    x.reset()
     
     while current_game:
 
@@ -259,7 +291,6 @@ if __name__ == "__main__":
                 current_game = False     
             # Will change this into action for the bot 
 
-
         # This is where the agent while give an action
         # After action we calculate reward in the enviroment
         # if player == "human"
@@ -268,6 +299,9 @@ if __name__ == "__main__":
 
         # step should return some stuff about the score of the game
         x.step(keys)
-
+    all_replays.append(x.history)
     
+
+
+    print(all_replays)
     
