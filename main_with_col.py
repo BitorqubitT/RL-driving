@@ -7,8 +7,11 @@ from utils.ui import play_level
 
 """
 TODO:
+# Fix collision
+# Cleanup code
+# Detach game rendering from other logic
+
 # Implement a training loop for rl
-# Store results (list of actions, sensor data?)
 # Set a param to toggle render or non render mode (research this)
 # Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
 # Use DQN with img or sensors data (setup both)
@@ -56,6 +59,55 @@ class Car(Sprite):
         self.position  = pygame.math.Vector2(x, y)
         self.player_type = player_human
 
+    def create_car_logic(self):
+        """ 
+            Car is basically 4 points and we create a hitbox.
+            We have a position x,y
+            From this we calculate the 4 edge points based on size image
+            Then we calculate 4 lines around the car
+            This way we can always calculate if the car hits the walls
+            put some of these in util
+        """
+        all_edges = []
+
+        angle_to_corner = math.degrees(math.atan(29.5/64.0))
+        for i in [0.0, 45.0, 180.0, 225.0]:
+            i = angle_to_corner + math.radians(i)
+            heading = self.heading + i
+            x = round(self.position[0] + math.cos(heading) * 70.472)
+            y = round(self.position[1] + math.sin(heading) * 70.472)
+            all_edges.append((x,y))
+        return all_edges
+
+    def calculate_angle(self, source, target):
+        velocity = (target[0] - source[0], target[1] - source[1])
+        angle = math.atan2(velocity[1], velocity[0])
+        return angle
+    
+    def calculate_hitboxes(self) -> list:
+        # Front, front_T, back_T, back_b       
+        corners = self.create_car_logic()
+        hitboxes = [[corners[0], corners[1]],
+                    [corners[1], corners[2]],
+                    [corners[2], corners[3]],
+                    [corners[3], corners[0]]]
+
+        #maybe check distance between points.
+        hitbox_points = []
+        for distance, point_pair in enumerate(hitboxes):
+            angle = self.calculate_angle(point_pair[0], point_pair[1])
+            # Set range based on distance between points
+            # We know this because of the size of the car.
+            if distance == 0 or distance == 2:
+                range_set = 30
+            if distance == 1 or distance == 3:
+                range_set = 128
+            for i in range(0, range_set):
+                x = round(point_pair[0][0] + math.cos(angle) * i)
+                y = round(point_pair[0][1] + math.sin(angle) * i)
+                hitbox_points.append((x, y))
+        return hitbox_points
+
     def _load_rotated_images(self, car_image: str) -> list:
         car_image = pygame.image.load(car_image).convert_alpha()
         rotated_images = []
@@ -92,6 +144,7 @@ class Car(Sprite):
         for i in range(0, 800):
             x = round(self.position[0] + math.cos(heading) * i)
             y = round(self.position[1] + math.sin(heading) * i)
+            # If we find a wall return x, y
             if arr[x, y]:
                 return x, y
 
@@ -102,6 +155,7 @@ class Car(Sprite):
         for i, angle in enumerate(ray_angles):
             x, y = self._cast_ray(walls, angle)
             all_position.append((x, y))
+            # We use distance for the sensors
             distance_to_wall = math.sqrt((x - self.position[0]) ** 2 + (y - self.position[1]) ** 2)
             distances.append(round(distance_to_wall))
         return all_position, distances
@@ -186,17 +240,15 @@ class Environment():
         self.car_group = pygame.sprite.Group()
         self.track_group = self._load_obstacles()
         self.finish_group = self._load_finish()
-        self.walls = self._get_walls(self.track.mask)
+        self.walls = self._get_walls("track_1.csv")
         self.checkpoints = self._set_checkpoints()
         clock = pygame.time.Clock()
         clock.tick_busy_loop(60)
-        # other way of doing this
         self.reset()
 
     def reset(self) -> None:
         # Do we want to reset the environment?
         laps = 0
-        print("how much do we run this")
         self.car = Car("assets/car1.png", 950, 100, True)
         self.car_group.add(self.car)
         if pygame.sprite.spritecollide(self.finish, self.car_group, False, pygame.sprite.collide_mask):
@@ -206,12 +258,19 @@ class Environment():
         self.car.action(keys)
         self.history.append(self.car.position)
         self.render()
+        x = self.car.calculate_hitboxes()
+        for i in x:
+            # TODO: Optimise, faster way to check?
+            # TODO: Check collision
+            if i in self.walls():
+                self.car.reset()
         # Calculate reward
         if self.car.check_checkpoint(self.checkpoints):
             self.reward += 1
             self.checkpoints.pop(0)
-        if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
-           self.car.reset()
+        #if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
+           #self.car.reset()
+
         return None
         
     def render(self) -> None:
@@ -222,8 +281,8 @@ class Environment():
         self.car_group.draw(self.window)
         self.finish_group.draw(self.window)
         positions, distances = self.car.distance_to_walls(self.walls)
-        for i in positions:
-            pygame.draw.line(self.window, (255, 113, 113), [self.car.position[0], self.car.position[1]], [i[0], i[1]], 5)
+        for i in self.car.calculate_hitboxes():
+            self.window.set_at((i[0], i[1]), (255, 113, 113))
         play_level(self.window, distances[0], distances[1], distances[2], self.car.speed, 1, self.reward)
         pygame.display.flip()
         return None
@@ -259,17 +318,7 @@ class Environment():
 
     # easy way to get the position of the track walls
     def _get_walls(self, track) -> np.array:
-        all_walls = []
-        for x in range(0, self.width):
-            line = []
-            for j in range(0, self.height):
-                if track.get_at((x, j)):
-                    line.append(True)
-                else:
-                    line.append(False)
-            all_walls.append(line)
-        wall_pos = np.array([np.array(x) for x in all_walls])
-        return wall_pos
+        return np.genfromtxt(track, delimiter=',', dtype = bool).reshape(1920, 1080)
 
 if __name__ == "__main__":
 
@@ -294,11 +343,13 @@ if __name__ == "__main__":
         # This is where the agent while give an action
         # After action we calculate reward in the enviroment
         # if player == "human"
+        
         keys = pygame.key.get_pressed()
 
 
         # step should return some stuff about the score of the game
         x.step(keys)
+
     all_replays.append(x.history)
     
 
