@@ -7,9 +7,10 @@ from utils.ui import play_level
 
 """
 TODO:
-# Fix collision
 # Cleanup code
 # Detach game rendering from other logic
+# Try to run it with simple"ai", check outputs
+# Check history mode
 
 # Implement a training loop for rl
 # Set a param to toggle render or non render mode (research this)
@@ -175,6 +176,8 @@ class Car(Sprite):
         self.image = self.rot_img[0]
         self.position  = pygame.math.Vector2(self.start_pos[0], self.start_pos[1])
         self.velocity  = pygame.math.Vector2(0, 0)
+        self.speed = 0
+        self.heading = 0
 
     def action(self, keys) -> None:
         # change this functiono depending on player or pc?
@@ -238,6 +241,8 @@ class Environment():
         self.reward = 0
         self.history = []
         self.car_group = pygame.sprite.Group()
+        # TODO: put these somewhere else?
+        # Maybe only load them when render mode is on
         self.track_group = self._load_obstacles()
         self.finish_group = self._load_finish()
         self.walls = self._get_walls("track_1.csv")
@@ -251,26 +256,27 @@ class Environment():
         laps = 0
         self.car = Car("assets/car1.png", 950, 100, True)
         self.car_group.add(self.car)
-        if pygame.sprite.spritecollide(self.finish, self.car_group, False, pygame.sprite.collide_mask):
-            laps += 1
+       # if pygame.sprite.spritecollide(self.finish, self.car_group, False, pygame.sprite.collide_mask):
+        #    laps += 1
 
     def step(self, keys) -> None:
         self.car.action(keys)
         self.history.append(self.car.position)
         self.render()
-        x = self.car.calculate_hitboxes()
-        for i in x:
-            # TODO: Optimise, faster way to check?
-            # TODO: Check collision
-            if i in self.walls():
-                self.car.reset()
+
+        # Get hitbox positions
+        indexlist = self.car.calculate_hitboxes()
+        indexlisttranspose = np.array(indexlist).T.tolist()
+        
+        # Create a list with map values at hitbox position.
+        # AKA check if wall was found
+        if True in self.walls[ tuple(indexlisttranspose)]:
+            self.car.reset()
+        
         # Calculate reward
         if self.car.check_checkpoint(self.checkpoints):
             self.reward += 1
             self.checkpoints.pop(0)
-        #if pygame.sprite.spritecollide(self.track, self.car_group, False, pygame.sprite.collide_mask):
-           #self.car.reset()
-
         return None
         
     def render(self) -> None:
@@ -315,6 +321,10 @@ class Environment():
                     (500, 150)
                     ]
         return checkpoints
+    
+    def _set_finish(self) -> tuple:
+        finish = (870, 100)
+        return finish
 
     # easy way to get the position of the track walls
     def _get_walls(self, track) -> np.array:
