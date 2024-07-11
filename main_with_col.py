@@ -23,7 +23,6 @@ TODO:
 # Will use raytracing for wall detection
 # This might not be viable if i train on image.
 
-
 Low prio:
 # Smaller car, better track
 # Make sure its easy to change levels
@@ -47,11 +46,13 @@ class Car(Sprite):
     def __init__(self, car_image:str, x: float, y: float, player_human = True):
         super().__init__()
         #TODO: clean this angle stuff
+        # TODO: FIX THIS FOR HUMAN
         self.rot_img = self._load_rotated_images(car_image)
-        self.min_angle = math.radians(1)
         self.image       = self.rot_img[0]
         self.rect        = self.image.get_rect()
         self.mask = pygame.mask.from_surface(self.image)
+        
+        self.min_angle = math.radians(1)
         self.start_pos = (x, y)
         self.reversing = False
         self.heading   = 0
@@ -169,6 +170,8 @@ class Car(Sprite):
     def update(self) -> None:
         self.velocity.from_polar((self.speed, math.degrees(self.heading)))
         self.position += self.velocity
+
+        # TODO: FIX THIS FOR HUMAN
         self.rect.center = (round(self.position[0]), round(self.position[1]))
 
     # Maybe remove this, because we restart the environment?
@@ -204,9 +207,9 @@ class Car(Sprite):
                 self._accelerate(0.1)
                 self._turn(-1.0)
             elif keys == 4:
-                self._accelerate(-0.1)
+                self._accelerate(0.1)
             elif keys == 5:
-                self._accelerate(-0.1)
+                self._accelerate(0.1)
                 self._turn(1.0)
             elif keys == 6:
                 self._accelerate(0.1)
@@ -229,50 +232,57 @@ class Level(Sprite):
 
 class Environment():
     """load and update the game, take in actions, keep score"""
-    def __init__(self):
-        pygame.init()
+    def __init__(self, mode):
         self.width, self.height = 1920, 1080
-        pygame.display.set_caption("Car sim :)")
-        self.window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_SURFACE)
+        # TODO: put these under mode?
+        clock = pygame.time.Clock()
+        clock.tick_busy_loop(60)
         #TODO: Which ones should be private
-        self.background = pygame.image.load("assets/background2.png")
         self.action_space = None
         self.observation_space = None
         self.reward = 0
         self.history = []
-        self.car_group = pygame.sprite.Group()
-        # TODO: put these somewhere else?
-        # Maybe only load them when render mode is on
-        self.track_group = self._load_obstacles()
-        self.finish_group = self._load_finish()
+        self.mode = mode
         self.walls = self._get_walls("track_1.csv")
         self.checkpoints = self._set_checkpoints()
-        clock = pygame.time.Clock()
-        clock.tick_busy_loop(60)
+        if mode != "ai":
+            self.width, self.height = 1920, 1080
+            pygame.init()
+            pygame.display.set_caption("Car sim :)")
+            self.window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), WINDOW_SURFACE)
+            self.background = pygame.image.load("assets/background2.png")
+            self.car_group = pygame.sprite.Group()
+            self.track_group = self._load_obstacles()
+            self.finish_group = self._load_finish()
         self.reset()
 
     def reset(self) -> None:
         # Do we want to reset the environment?
-        laps = 0
-        self.car = Car("assets/car1.png", 950, 100, True)
-        self.car_group.add(self.car)
-       # if pygame.sprite.spritecollide(self.finish, self.car_group, False, pygame.sprite.collide_mask):
-        #    laps += 1
+
+        # TODO: Cleaner way to solve this?
+        if self.mode != "ai":
+            self.car = Car("assets/car1.png", 950, 100, True)
+            self.car_group.add(self.car)
+        else:
+            self.car = Car("assets/car1.png", 950, 100, False)
 
     def step(self, keys) -> None:
         self.car.action(keys)
         self.history.append(self.car.position)
-        self.render()
 
+        if self.mode == "player":
+            self.render()
+        
         # Get hitbox positions
         indexlist = self.car.calculate_hitboxes()
         indexlisttranspose = np.array(indexlist).T.tolist()
         
         # Create a list with map values at hitbox position.
         # AKA check if wall was found
+        self.car.update()
         if True in self.walls[ tuple(indexlisttranspose)]:
             self.car.reset()
-        
+
         # Calculate reward
         if self.car.check_checkpoint(self.checkpoints):
             self.reward += 1
@@ -332,37 +342,27 @@ class Environment():
 
 if __name__ == "__main__":
 
-
+    # player, view, ai
+    MODE = "player"
     all_replays = []
+    x = Environment(MODE)
 
-    current_game = True
+    if MODE == "ai":
+        for i in range(0, 1000000000000):
+            # We want to train for n episodes
+            # But we should reset the game state etc when we crash into a wall
+            # Also how do we capture rewards for replay?
+            x.step(4)
+        #all_replays.append(x.history)
 
-    x = Environment()
-    
-    while current_game:
-
-        # We want to train for n episodes
-        # But we should reset the game state etc when we crash into a wall
-        # Also how do we capture rewards for replay?
-
-        for event in pygame.event.get():
-            if (event.type == pygame.QUIT):
-                current_game = False     
-            # Will change this into action for the bot 
-
-        # This is where the agent while give an action
-        # After action we calculate reward in the enviroment
-        # if player == "human"
-        
-        keys = pygame.key.get_pressed()
-
-
-        # step should return some stuff about the score of the game
-        x.step(keys)
+    elif MODE == "player":
+        current_game = True
+        while current_game:
+            for event in pygame.event.get():
+                if (event.type == pygame.QUIT):
+                    current_game = False     
+            keys = pygame.key.get_pressed()
+            x.step(keys)
 
     all_replays.append(x.history)
-    
-
-
     print(all_replays)
-    
