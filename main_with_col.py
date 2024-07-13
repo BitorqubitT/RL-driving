@@ -4,24 +4,26 @@ import pygame.freetype
 from pygame.sprite import Sprite
 import numpy as np
 from utils.ui import play_level
+import pickle
 
 """
 TODO:
-# Cleanup code
-# Detach game rendering from other logic
-# Try to run it with simple"ai", check outputs
-# Check history mode
+# Write and read the history (check which vars to save)
+# Replay history with renderer (convert ai output to human input)
+# Graph some stats based on replay
+# Code clean and check
 
 # Implement a training loop for rl
-# Set a param to toggle render or non render mode (research this)
-# Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
+# Reward and penalty
+# How to deal with finish?
+
+# Use DQN algorithm
 # Use DQN with img or sensors data (setup both)
 
-# Might need to seperate rendering from everything.
-# This way I can run render or renderless mode, faster training
-# Will need to get rid of a lot of pygame functions since they wont work
+# Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
+
 # Will use raytracing for wall detection
-# This might not be viable if i train on image.
+# This might not be necessary if i train on image only.
 
 Low prio:
 # Smaller car, better track
@@ -46,11 +48,6 @@ class Car(Sprite):
     def __init__(self, car_image:str, x: float, y: float, player_human = True):
         super().__init__()
         #TODO: clean this angle stuff
-        # TODO: FIX THIS FOR HUMAN
-        self.rot_img = self._load_rotated_images(car_image)
-        self.image       = self.rot_img[0]
-        self.rect        = self.image.get_rect()
-        self.mask = pygame.mask.from_surface(self.image)
         
         self.min_angle = math.radians(1)
         self.start_pos = (x, y)
@@ -60,6 +57,13 @@ class Car(Sprite):
         self.velocity  = pygame.math.Vector2(0, 0)
         self.position  = pygame.math.Vector2(x, y)
         self.player_type = player_human
+        if self.player_type is True:
+            self.rot_img = self._load_rotated_images(car_image)
+            self.image   = self.rot_img[0]
+            self.rect    = self.image.get_rect()
+            self.mask    = pygame.mask.from_surface(self.image)
+
+
 
     def create_car_logic(self):
         """ 
@@ -119,15 +123,16 @@ class Car(Sprite):
         return rotated_images
 
     def _turn(self, angle_degrees) -> None:
-        self.heading += math.radians(angle_degrees) 
-        image_index = int(self.heading / self.min_angle) % len(self.rot_img)
-        if (self.image != self.rot_img[ image_index ]):
-            x,y = self.rect.center
-            self.image = self.rot_img[ image_index ]
-            self.rect  = self.image.get_rect()
-            self.rect.center = (x,y)
-            # need to update mask or collision will use og image
-            self.mask = pygame.mask.from_surface(self.image)
+        self.heading += math.radians(angle_degrees)
+        if self.player_type is True: 
+            image_index = int(self.heading / self.min_angle) % len(self.rot_img)
+            if (self.image != self.rot_img[ image_index ]):
+                x,y = self.rect.center
+                self.image = self.rot_img[ image_index ]
+                self.rect  = self.image.get_rect()
+                self.rect.center = (x,y)
+                # need to update mask or collision will use og image
+                self.mask = pygame.mask.from_surface(self.image)
 
     def _accelerate(self, amount) -> None:
         # Add more realistic way of accelerating + a normal speed cap
@@ -171,12 +176,13 @@ class Car(Sprite):
         self.velocity.from_polar((self.speed, math.degrees(self.heading)))
         self.position += self.velocity
 
-        # TODO: FIX THIS FOR HUMAN
-        self.rect.center = (round(self.position[0]), round(self.position[1]))
+        # TODO: FIX THIS FOR HUMAN and AI
+        if self.player_type is True:
+            self.rect.center = (round(self.position[0]), round(self.position[1]))
 
     # Maybe remove this, because we restart the environment?
     def reset(self) -> None:
-        self.image = self.rot_img[0]
+        #self.image = self.rot_img[0]
         self.position  = pygame.math.Vector2(self.start_pos[0], self.start_pos[1])
         self.velocity  = pygame.math.Vector2(0, 0)
         self.speed = 0
@@ -196,6 +202,7 @@ class Car(Sprite):
                 if keys[pygame.K_LEFT]:
                     self._turn(-1.0)
         else:
+            # TODO: Does it make sense to do both at the same time?
             if keys == 0:
                 pass
             elif keys == 1:
@@ -257,8 +264,6 @@ class Environment():
         self.reset()
 
     def reset(self) -> None:
-        # Do we want to reset the environment?
-
         # TODO: Cleaner way to solve this?
         if self.mode != "ai":
             self.car = Car("assets/car1.png", 950, 100, True)
@@ -268,7 +273,9 @@ class Environment():
 
     def step(self, keys) -> None:
         self.car.action(keys)
-        self.history.append(self.car.position)
+        
+        # Log car pos and keys
+        self.history.append([self.car.position, keys])
 
         if self.mode == "player":
             self.render()
@@ -282,6 +289,8 @@ class Environment():
         self.car.update()
         if True in self.walls[ tuple(indexlisttranspose)]:
             self.car.reset()
+            # This way we can filter every reset.
+            self.history.append("reset")
 
         # Calculate reward
         if self.car.check_checkpoint(self.checkpoints):
@@ -353,6 +362,8 @@ if __name__ == "__main__":
             # But we should reset the game state etc when we crash into a wall
             # Also how do we capture rewards for replay?
             x.step(4)
+            x.step(3)
+        
         #all_replays.append(x.history)
 
     elif MODE == "player":
@@ -363,6 +374,20 @@ if __name__ == "__main__":
                     current_game = False     
             keys = pygame.key.get_pressed()
             x.step(keys)
+            all_replays.append(x.history)
+    
+    print(len(all_replays))
+    #print(all_replays)
 
-    all_replays.append(x.history)
-    print(all_replays)
+    for i in all_replays:
+        print(len(i))
+
+    # TODO:
+    # Add function to clean the output from all replays
+    # Add function to read a replay file
+    # For replay we only need the replays
+    # Maybe capture less positions
+    # put some random intakes for ai
+    # then use this as input for rebuild -> convert to player movement
+    # Otherwise I need to change the whole check for humna player
+    # Capture score?
