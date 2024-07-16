@@ -5,13 +5,26 @@ from pygame.sprite import Sprite
 import numpy as np
 from utils.ui import play_level
 import pickle
+from datetime import date
 
 """
+TODO:
+# Test store replay function first.
+# Add function to read a replay file
+# For replay we only need the replays
+# Maybe capture less positions
+# put some random intakes for ai
+# then use this as input for rebuild -> convert to player movement
+# Give up on replaying my own (its annoying with pygame scancodewrapper)
+# Just make replay work for AI.
+# Otherwise I need to change the whole check for humna player
+# Capture score?
+
+
 TODO:
 # Write and read the history (check which vars to save)
 # Replay history with renderer (convert ai output to human input)
 # Graph some stats based on replay
-# Code clean and check
 
 # Implement a training loop for rl
 # Reward and penalty
@@ -193,6 +206,7 @@ class Car(Sprite):
         # if pc just give int value between 1->8 actions?
         if self.player_type:
             if keys[pygame.K_UP]:
+                print(keys[pygame.K_UP])
                 self._accelerate(0.1)
             if keys[pygame.K_DOWN]:
                 self._brake()
@@ -273,8 +287,6 @@ class Environment():
 
     def step(self, keys) -> None:
         self.car.action(keys)
-        
-        # Log car pos and keys
         self.history.append([self.car.position, keys])
 
         if self.mode == "player":
@@ -289,7 +301,7 @@ class Environment():
         self.car.update()
         if True in self.walls[ tuple(indexlisttranspose)]:
             self.car.reset()
-            # This way we can filter every reset.
+            #TODO: Add reward or other stats, maybe?
             self.history.append("reset")
 
         # Calculate reward
@@ -352,19 +364,19 @@ class Environment():
 if __name__ == "__main__":
 
     # player, view, ai
-    MODE = "player"
+    MODE = "ai"
     all_replays = []
     x = Environment(MODE)
 
     if MODE == "ai":
-        for i in range(0, 1000000000000):
+        for i in range(0, 100):
             # We want to train for n episodes
             # But we should reset the game state etc when we crash into a wall
-            # Also how do we capture rewards for replay?
             x.step(4)
             x.step(3)
+            x.step(7)
         
-        #all_replays.append(x.history)
+        all_replays.append(x.history)
 
     elif MODE == "player":
         current_game = True
@@ -376,18 +388,37 @@ if __name__ == "__main__":
             x.step(keys)
             all_replays.append(x.history)
     
-    print(len(all_replays))
     #print(all_replays)
+    #print(len(all_replays))
+    if "reset" in all_replays[0]:
+        print("got it")
+        
+    #TODO: What do we want output and input to look like?
+    def store_replay(replays) -> list:
+        """_summary_
 
-    for i in all_replays:
-        print(len(i))
+        Args:
+            replays (_type_): _description_
 
-    # TODO:
-    # Add function to clean the output from all replays
-    # Add function to read a replay file
-    # For replay we only need the replays
-    # Maybe capture less positions
-    # put some random intakes for ai
-    # then use this as input for rebuild -> convert to player movement
-    # Otherwise I need to change the whole check for humna player
-    # Capture score?
+        Returns:
+            list: _description_
+        """
+        # TODO: maybe add other stats to replay
+        replay_per_run = []
+        indices = [i for i, replay in enumerate(replays[0]) if replay == "reset"]
+        for i in range(0, len(indices) + 1):
+            # TODO: clean this
+            if i == 0:
+                a = 0
+            else:
+                a = indices[i - 1]
+            
+            if i == len(indices):
+                b = len(replays[0])
+            else:
+                b = indices[i]
+            replay_per_run.append(replays[0][a:b])
+        return replay_per_run
+    
+    replay_per_run = store_replay(all_replays)
+    print(len(replay_per_run))
