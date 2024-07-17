@@ -4,28 +4,11 @@ import pygame.freetype
 from pygame.sprite import Sprite
 import numpy as np
 from utils.ui import play_level
-import pickle
-from datetime import date
+from utils.helper import store_replay
+from utils.helper import read_replay
 
 """
 TODO:
-# Test store replay function first.
-# Add function to read a replay file
-# For replay we only need the replays
-# Maybe capture less positions
-# put some random intakes for ai
-# then use this as input for rebuild -> convert to player movement
-# Give up on replaying my own (its annoying with pygame scancodewrapper)
-# Just make replay work for AI.
-# Otherwise I need to change the whole check for humna player
-# Capture score?
-
-
-TODO:
-# Write and read the history (check which vars to save)
-# Replay history with renderer (convert ai output to human input)
-# Graph some stats based on replay
-
 # Implement a training loop for rl
 # Reward and penalty
 # How to deal with finish?
@@ -58,7 +41,7 @@ GREEN = (0, 255, 0)
 
 class Car(Sprite):
 
-    def __init__(self, car_image:str, x: float, y: float, player_human = True):
+    def __init__(self, car_image:str, x: float, y: float, player_type):
         super().__init__()
         #TODO: clean this angle stuff
         
@@ -69,13 +52,12 @@ class Car(Sprite):
         self.speed     = 0 
         self.velocity  = pygame.math.Vector2(0, 0)
         self.position  = pygame.math.Vector2(x, y)
-        self.player_type = player_human
-        if self.player_type is True:
+        self.player_type = player_type
+        if self.player_type != "ai":
             self.rot_img = self._load_rotated_images(car_image)
             self.image   = self.rot_img[0]
             self.rect    = self.image.get_rect()
             self.mask    = pygame.mask.from_surface(self.image)
-
 
 
     def create_car_logic(self):
@@ -137,7 +119,7 @@ class Car(Sprite):
 
     def _turn(self, angle_degrees) -> None:
         self.heading += math.radians(angle_degrees)
-        if self.player_type is True: 
+        if self.player_type != "ai":
             image_index = int(self.heading / self.min_angle) % len(self.rot_img)
             if (self.image != self.rot_img[ image_index ]):
                 x,y = self.rect.center
@@ -190,7 +172,7 @@ class Car(Sprite):
         self.position += self.velocity
 
         # TODO: FIX THIS FOR HUMAN and AI
-        if self.player_type is True:
+        if self.player_type != "ai":
             self.rect.center = (round(self.position[0]), round(self.position[1]))
 
     # Maybe remove this, because we restart the environment?
@@ -204,9 +186,8 @@ class Car(Sprite):
     def action(self, keys) -> None:
         # change this functiono depending on player or pc?
         # if pc just give int value between 1->8 actions?
-        if self.player_type:
+        if self.player_type == "player":
             if keys[pygame.K_UP]:
-                print(keys[pygame.K_UP])
                 self._accelerate(0.1)
             if keys[pygame.K_DOWN]:
                 self._brake()
@@ -279,17 +260,17 @@ class Environment():
 
     def reset(self) -> None:
         # TODO: Cleaner way to solve this?
-        if self.mode != "ai":
-            self.car = Car("assets/car1.png", 950, 100, True)
+        if self.mode == "player" or self.mode == "view":
+            self.car = Car("assets/car1.png", 950, 100, self.mode)
             self.car_group.add(self.car)
         else:
-            self.car = Car("assets/car1.png", 950, 100, False)
+            self.car = Car("assets/car1.png", 950, 100, "ai")
 
     def step(self, keys) -> None:
         self.car.action(keys)
         self.history.append([self.car.position, keys])
 
-        if self.mode == "player":
+        if self.mode != "ai":
             self.render()
         
         # Get hitbox positions
@@ -364,20 +345,24 @@ class Environment():
 if __name__ == "__main__":
 
     # player, view, ai
-    MODE = "ai"
+    MODE = "view"
     all_replays = []
     x = Environment(MODE)
 
     if MODE == "ai":
-        for i in range(0, 100):
-            # We want to train for n episodes
-            # But we should reset the game state etc when we crash into a wall
-            x.step(4)
+        for i in range(0, 10000):
+            x.step(0)
+            x.step(0)
+            x.step(1)
+            x.step(0)
+            x.step(0)
+            x.step(0)
+            x.step(1)
             x.step(3)
-            x.step(7)
         
         all_replays.append(x.history)
-
+        replay_per_run = store_replay(all_replays)
+    
     elif MODE == "player":
         current_game = True
         while current_game:
@@ -386,39 +371,13 @@ if __name__ == "__main__":
                     current_game = False     
             keys = pygame.key.get_pressed()
             x.step(keys)
-            all_replays.append(x.history)
-    
-    #print(all_replays)
-    #print(len(all_replays))
-    if "reset" in all_replays[0]:
-        print("got it")
+
+    elif MODE == "view":
         
-    #TODO: What do we want output and input to look like?
-    def store_replay(replays) -> list:
-        """_summary_
+        FILENAME = "replays/rpl0-20240717-201542.csv"
+        coordinates, moves = read_replay(FILENAME)
+        #TODO: use enumerate
+        for i in range(0, len(moves)):
+            x.step(moves[i])
 
-        Args:
-            replays (_type_): _description_
 
-        Returns:
-            list: _description_
-        """
-        # TODO: maybe add other stats to replay
-        replay_per_run = []
-        indices = [i for i, replay in enumerate(replays[0]) if replay == "reset"]
-        for i in range(0, len(indices) + 1):
-            # TODO: clean this
-            if i == 0:
-                a = 0
-            else:
-                a = indices[i - 1]
-            
-            if i == len(indices):
-                b = len(replays[0])
-            else:
-                b = indices[i]
-            replay_per_run.append(replays[0][a:b])
-        return replay_per_run
-    
-    replay_per_run = store_replay(all_replays)
-    print(len(replay_per_run))
