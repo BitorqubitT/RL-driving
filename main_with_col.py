@@ -1,6 +1,10 @@
 import math
 import pygame
 import pygame.freetype
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
 from pygame.sprite import Sprite
 import numpy as np
 from utils.ui import play_level
@@ -11,17 +15,16 @@ from utils.helper import read_replay
 TODO:
 # Implement a training loop for rl
 # Reward and penalty
-# How to deal with finish?
+# Maybe make it possible to keep going after one lap
+# Can also implement this after network
 
 # Use DQN algorithm
 # Use DQN with img or sensors data (setup both)
 
 # Statistics: save drive, raceline, pos+speed, crashes (write them to csv?)
 
-# Will use raytracing for wall detection
-# This might not be necessary if i train on image only.
-
 Low prio:
+# How to deal with finish?
 # Smaller car, better track
 # Make sure its easy to change levels
 # Clean code + PEP8
@@ -163,7 +166,7 @@ class Car(Sprite):
         return all_position, distances
     
     def check_checkpoint(self, checkpoints) -> bool:
-        if math.dist(self.position, checkpoints[0]) <= 70.0:
+        if math.dist(self.position, checkpoints[0]) <= 80.0:
             return True
         return False
 
@@ -281,6 +284,8 @@ class Environment():
         # AKA check if wall was found
         self.car.update()
         if True in self.walls[ tuple(indexlisttranspose)]:
+            # Add a penalty for hitting a wall
+            self.reward -= 1
             self.car.reset()
             #TODO: Add reward or other stats, maybe?
             self.history.append("reset")
@@ -345,32 +350,77 @@ class Environment():
 if __name__ == "__main__":
 
     # player, view, ai
-    MODE = "view"
+    MODE = "player"
     all_replays = []
-    x = Environment(MODE)
-
+    env = Environment(MODE)
+    scores= []
+    
     if MODE == "ai":
+
+        if torch.cuda.is_available() or torch.backends.mps.is_available():
+            num_episodes = 600
+        else:
+            num_episodes = 50
+
         for i in range(0, 10000):
-            x.step(0)
-            x.step(0)
-            x.step(1)
-            x.step(0)
-            x.step(0)
-            x.step(0)
-            x.step(1)
-            x.step(3)
+            
+            current_game = True
+
+            BATCH_SIZE = 128
+            GAMMA = 0.99
+            EPS_START = 0.9
+            EPS_END = 0.05
+            EPS_DECAY = 1000
+            TAU = 0.005
+            LR = 1e-4
+
+            n_actions = # set action space
+
+            # What do we put in info?
+            #state, info = env.reset()
+
+
+
+
+            while current_game:
+                
+                for event in pygame.even.get():
+                    if event.type == pygame.QUIT:
+                        #return
+                        # Check if this is correct
+                        current_game = False
+
+            # let the agent choose action
+
+            # use action as input to the game
+            # x.step(action)
+
+            # somehow return observation, reward, current_game (is this corrrect?)
+            # observation can be image around the car (can change this)
+            # obeservation can be input from sensors
+
+            # check if we get a reward in x ticks
+            # if we dont the end this run/episode
+
+            # put this output in the network.
+            # pUT SAFEGUARD HERE    
+            # Save output from the netowrk
+            # scores.append(something)
+
+            # update network parms
         
-        all_replays.append(x.history)
-        replay_per_run = store_replay(all_replays)
+            all_replays.append(env.history)
+            replay_per_run = store_replay(all_replays)
     
     elif MODE == "player":
         current_game = True
+        
         while current_game:
             for event in pygame.event.get():
-                if (event.type == pygame.QUIT):
+                if event.type == pygame.QUIT:
                     current_game = False     
             keys = pygame.key.get_pressed()
-            x.step(keys)
+            env.step(keys)
 
     elif MODE == "view":
         
@@ -378,6 +428,6 @@ if __name__ == "__main__":
         coordinates, moves = read_replay(FILENAME)
         #TODO: use enumerate
         for i in range(0, len(moves)):
-            x.step(moves[i])
+            env.step(moves[i])
 
 
