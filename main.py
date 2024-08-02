@@ -16,6 +16,8 @@ from dqn import DQN
 from dqn import select_action
 from dqn import plot_durations
 from dqn import ReplayMemory
+from collections import namedtuple, deque
+import asyncio
 
 """
 TODO:
@@ -155,14 +157,18 @@ class Car(Sprite):
     def _cast_ray(self, arr, angle_offset) -> None:
         x, y = 0, 0
         heading = self.heading + angle_offset
-        for i in range(0, 800):
+        #print(heading, self.position)
+        # TODO: find more efficient way to do this
+        # And make sure the range is enough
+        for i in range(0, 900):
             x = round(self.position[0] + math.cos(heading) * i)
             y = round(self.position[1] + math.sin(heading) * i)
+            #print("we hawt", x, y)
             # If we find a wall return x, y
             if arr[x, y]:
                 return x, y
 
-    def distance_to_walls(self, walls) -> list:    
+    def distance_to_walls(self, walls) -> list:
         ray_angles = [0, 70, -70]
         distances = []
         #all_position = []
@@ -376,12 +382,13 @@ if __name__ == "__main__":
     env = Environment(MODE)
     scores= []
 
-    # if GPU is to be used
     device = torch.device(
         "cuda" if torch.cuda.is_available() else
         "mps" if torch.backends.mps.is_available() else
         "cpu"
     )
+
+    device = "cpu"
 
     print(device)
     
@@ -432,7 +439,12 @@ if __name__ == "__main__":
             def optimize_model():
                 if len(memory) < BATCH_SIZE:
                     return
+                
+                Transition = namedtuple('Transition',
+                        ('state', 'action', 'next_state', 'reward'))
+                
                 transitions = memory.sample(BATCH_SIZE)
+                print(transitions)
                 # detailed explanation). This converts batch-array of Transitions
                 # to Transition of batch-arrays.
                 batch = Transition(*zip(*transitions))
@@ -450,6 +462,13 @@ if __name__ == "__main__":
                 # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
                 # columns of actions taken. These are the actions which would've been taken
                 # for each batch state according to policy_net
+                print("-----------------------------------------------")
+                print(state_batch.shape)
+                # TODO: change to one-hot encoding maybe?
+                print(action_batch.shape)
+                print(policy_net(state_batch).shape)
+                # TODO: check what happens in this function
+
                 state_action_values = policy_net(state_batch).gather(1, action_batch)
 
                 # Compute V(s_{t+1}) for all next states.
@@ -457,6 +476,8 @@ if __name__ == "__main__":
                 # on the "older" target_net; selecting their best reward with max(1).values
                 # This is merged based on the mask, such that we'll have either the expected
                 # state value or 0 in case the state was final.
+                print(BATCH_SIZE)
+                print(device)
                 next_state_values = torch.zeros(BATCH_SIZE, device=device)
                 with torch.no_grad():
                     next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
@@ -478,7 +499,7 @@ if __name__ == "__main__":
 
                 # TODO: check inputs for select_action
                 action = select_action(state, env, policy_net)
-                print(action)
+                print(action.item())
                 # TODO: adept step to return certain items.
                 # What should every type be, what do we need in terminated, truncated
                 # Why do we return these variables instead of just checking them through the object
@@ -509,16 +530,16 @@ if __name__ == "__main__":
 
                 if done:
                     episode_durations.append(t + 1)
-                    plot_durations()
+                    #plot_durations()
                     break
         
             #all_replays.append(env.history)
             #replay_per_run = store_replay(all_replays)
             
             print("Finished")
-            plot_durations(show_result=True)
-            plt.ioff()
-            plt.show()
+            #plot_durations(show_result=True)
+            #plt.ioff()
+            #plt.show()
 
     elif MODE == "player":
         current_game = True
