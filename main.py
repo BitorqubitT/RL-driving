@@ -22,6 +22,7 @@ import asyncio
 """
 TODO:
 # TORCH CUDA
+# Might want to normalise the sensor data / scale them
 # Reward and penalty
 # Maybe make it possible to keep going after one lap
 # Can also implement this after network
@@ -41,6 +42,7 @@ Low prio:
 # Clean code + PEP8
 # Faster time training
 # private _ or __
+
 """
 
 # Window size
@@ -258,7 +260,7 @@ class Environment():
         clock = pygame.time.Clock()
         clock.tick_busy_loop(60)
         #TODO: Which ones should be private
-        self.action_space = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        self.action_space = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8])
         self.observation_space = None
         self.reward = 0
         self.history = []
@@ -413,16 +415,14 @@ if __name__ == "__main__":
             # TODO: remove this and check for t in count()
             t = 0
             
-            n_actions = 8
+            n_actions = 9
 
             # TODO: Can chose to let env.reset return state or grab it in another way.
             #state, info = env.reset()
             state = env.reset()
-            print(state)
             state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
             n_observations = 3 #len(state[0])
 
-            print(n_observations, n_actions)
             # TODO: Set device
             policy_net = DQN(n_observations, n_actions).to(device)
             target_net = DQN(n_observations, n_actions).to(device)
@@ -444,7 +444,6 @@ if __name__ == "__main__":
                         ('state', 'action', 'next_state', 'reward'))
                 
                 transitions = memory.sample(BATCH_SIZE)
-                print(transitions)
                 # detailed explanation). This converts batch-array of Transitions
                 # to Transition of batch-arrays.
                 batch = Transition(*zip(*transitions))
@@ -458,26 +457,20 @@ if __name__ == "__main__":
                 state_batch = torch.cat(batch.state)
                 action_batch = torch.cat(batch.action)
                 reward_batch = torch.cat(batch.reward)
-
                 # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
                 # columns of actions taken. These are the actions which would've been taken
                 # for each batch state according to policy_net
-                print("-----------------------------------------------")
-                print(state_batch.shape)
+
                 # TODO: change to one-hot encoding maybe?
-                print(action_batch.shape)
-                print(policy_net(state_batch).shape)
                 # TODO: check what happens in this function
+                # TODO: Scale state_batch?????
 
                 state_action_values = policy_net(state_batch).gather(1, action_batch)
-
                 # Compute V(s_{t+1}) for all next states.
                 # Expected values of actions for non_final_next_states are computed based
                 # on the "older" target_net; selecting their best reward with max(1).values
                 # This is merged based on the mask, such that we'll have either the expected
                 # state value or 0 in case the state was final.
-                print(BATCH_SIZE)
-                print(device)
                 next_state_values = torch.zeros(BATCH_SIZE, device=device)
                 with torch.no_grad():
                     next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
@@ -498,8 +491,9 @@ if __name__ == "__main__":
             while current_game:
 
                 # TODO: check inputs for select_action
+                # We update the model in select actoin
                 action = select_action(state, env, policy_net)
-                print(action.item())
+                print("actoin", action.item())
                 # TODO: adept step to return certain items.
                 # What should every type be, what do we need in terminated, truncated
                 # Why do we return these variables instead of just checking them through the object
@@ -517,7 +511,6 @@ if __name__ == "__main__":
                 memory.push(state, action, next_state, reward)
 
                 state = next_state
-
                 optimize_model()
 
                 target_net_state_dict = target_net.state_dict()
@@ -525,21 +518,20 @@ if __name__ == "__main__":
 
                 for key in policy_net_state_dict:
                     target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key] * (1-TAU)
-                
                 target_net.load_state_dict(target_net_state_dict)
-
                 if done:
+                    print(" we get here")
                     episode_durations.append(t + 1)
-                    #plot_durations()
+                    plot_durations()
                     break
         
             #all_replays.append(env.history)
             #replay_per_run = store_replay(all_replays)
             
             print("Finished")
-            #plot_durations(show_result=True)
-            #plt.ioff()
-            #plt.show()
+            plot_durations(show_result=True)
+            plt.ioff()
+            plt.show()
 
     elif MODE == "player":
         current_game = True
