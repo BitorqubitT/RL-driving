@@ -20,12 +20,16 @@ from collections import namedtuple, deque
 import asyncio
 
 """
+SOLVE:
+# Difference when using the input from ai lap in replay functions,
+# Different speeds, or rounding errors maybe?
+# Play myself and then use this as inputto check
+# Check if both have the same iterations (limit to one run)
+
 TODO:
-# TORCH CUDA
 # Might want to normalise the sensor data / scale them
 # Reward and penalty
 # Maybe make it possible to keep going after one lap
-# Can also implement this after network
 
 # Use DQN algorithm
 # Use DQN with img or sensors data (setup both)
@@ -287,15 +291,20 @@ class Environment():
         else:
             self.car = Car("assets/car1.png", 950, 100, "ai")
         distances = self.car.distance_to_walls(self.walls)
+        self.checkpoints = self._set_checkpoints()
         return distances
 
     def sample(self):
         return random.choice(self.action_space)
 
     def step(self, keys) -> None:
-        self.car.action(keys)
-        self.history.append([self.car.position, keys])
+        #self.car.action(keys)
 
+        # If I give the position directly it just updates lol
+        # Its a reference to the object
+        self.history.append([(self.car.position[0], self.car.position[1]), keys])
+
+        self.car.action(keys)
         if self.mode != "ai":
             self.render()
         
@@ -308,7 +317,7 @@ class Environment():
         # Create a list with map values at hitbox position.
         # AKA check if wall was found
         self.car.update()
-        if True in self.walls[ tuple(indexlisttranspose)]:
+        if True in self.walls[tuple(indexlisttranspose)]:
             # Add a penalty for hitting a wall
             self.reward -= 1
             self.car.reset()
@@ -318,14 +327,16 @@ class Environment():
         
         # Calculate reward
         if self.car.check_checkpoint(self.checkpoints):
+            #print("huge reward")
             self.reward += 1
             self.checkpoints.pop(0)
 
         # TODO: make this accesible through the environment by adding it at init?
-
         return distances, self.reward, False, False
         
     def render(self) -> None:
+        #pygame.time.delay(10)
+        #self.clock = pygame.time.Clock()
         self.car.distance_to_walls(self.walls)
         self.window.blit(self.background, (0, 0))
         self.car_group.update()
@@ -336,6 +347,7 @@ class Environment():
         for i in self.car.calculate_hitboxes():
             self.window.set_at((i[0], i[1]), (255, 113, 113))
         play_level(self.window, distances[0], distances[1], distances[2], self.car.speed, 1, self.reward)
+        #self.clock.tick(60)
         pygame.display.flip()
         return None
 
@@ -390,32 +402,84 @@ if __name__ == "__main__":
         "cpu"
     )
 
-    device = "cpu"
+    device = "cuda"
+
+        # Move this?
+    def optimize_model():
+        if len(memory) < BATCH_SIZE:
+            return
+        
+        Transition = namedtuple('Transition',
+                ('state', 'action', 'next_state', 'reward'))
+        
+        transitions = memory.sample(BATCH_SIZE)
+        # detailed explanation). This converts batch-array of Transitions
+        # to Transition of batch-arrays.
+        batch = Transition(*zip(*transitions))
+
+        # Compute a mask of non-final states and concatenate the batch elements
+        # (a final state would've been the one after which simulation ended)
+        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
+                                            batch.next_state)), device=device, dtype=torch.bool)
+        non_final_next_states = torch.cat([s for s in batch.next_state
+                                                    if s is not None])
+        state_batch = torch.cat(batch.state)
+        action_batch = torch.cat(batch.action)
+        reward_batch = torch.cat(batch.reward)
+        # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
+        # columns of actions taken. These are the actions which would've been taken
+        # for each batch state according to policy_net
+
+        # TODO: change to one-hot encoding maybe?
+        # TODO: check what happens in this function
+        # TODO: Scale state_batch?????
+
+        state_action_values = policy_net(state_batch).gather(1, action_batch)
+        # Compute V(s_{t+1}) for all next states.
+        # Expected values of actions for non_final_next_states are computed based
+        # on the "older" target_net; selecting their best reward with max(1).values
+        # This is merged based on the mask, such that we'll have either the expected
+        # state value or 0 in case the state was final.
+        next_state_values = torch.zeros(BATCH_SIZE, device=device)
+        with torch.no_grad():
+            next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
+        # Compute the expected Q values
+        expected_state_action_values = (next_state_values * GAMMA) + reward_batch
+
+        # Compute Huber loss
+        criterion = nn.SmoothL1Loss()
+        loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+
+        # Optimize the model
+        optimizer.zero_grad()
+        loss.backward()
+        # In-place gradient clipping
+        torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
+        optimizer.step()
 
     print(device)
     
     if MODE == "ai":
 
+        current_game = True
+        BATCH_SIZE = 128
+        GAMMA = 0.99
+        EPS_START = 0.9
+        EPS_END = 0.05
+        EPS_DECAY = 1000
+        TAU = 0.005
+        LR = 1e-4
+        t = 0
+        n_actions = 9
+        episode_durations = []
+
+            # TODO: remove this and check for t in count()
         if torch.cuda.is_available() or torch.backends.mps.is_available():
             num_episodes = 600
         else:
             num_episodes = 50
 
         for i in range(0, 10000):
-            
-            current_game = True
-            BATCH_SIZE = 128
-            GAMMA = 0.99
-            EPS_START = 0.9
-            EPS_END = 0.05
-            EPS_DECAY = 1000
-            TAU = 0.005
-            LR = 1e-4
-            
-            # TODO: remove this and check for t in count()
-            t = 0
-            
-            n_actions = 9
 
             # TODO: Can chose to let env.reset return state or grab it in another way.
             #state, info = env.reset()
@@ -431,69 +495,12 @@ if __name__ == "__main__":
             optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
             memory = ReplayMemory(10000)
 
-            steps_done = 0
-
-            episode_durations = []
-
-            # Move this?
-            def optimize_model():
-                if len(memory) < BATCH_SIZE:
-                    return
-                
-                Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
-                
-                transitions = memory.sample(BATCH_SIZE)
-                # detailed explanation). This converts batch-array of Transitions
-                # to Transition of batch-arrays.
-                batch = Transition(*zip(*transitions))
-
-                # Compute a mask of non-final states and concatenate the batch elements
-                # (a final state would've been the one after which simulation ended)
-                non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                                    batch.next_state)), device=device, dtype=torch.bool)
-                non_final_next_states = torch.cat([s for s in batch.next_state
-                                                            if s is not None])
-                state_batch = torch.cat(batch.state)
-                action_batch = torch.cat(batch.action)
-                reward_batch = torch.cat(batch.reward)
-                # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
-                # columns of actions taken. These are the actions which would've been taken
-                # for each batch state according to policy_net
-
-                # TODO: change to one-hot encoding maybe?
-                # TODO: check what happens in this function
-                # TODO: Scale state_batch?????
-
-                state_action_values = policy_net(state_batch).gather(1, action_batch)
-                # Compute V(s_{t+1}) for all next states.
-                # Expected values of actions for non_final_next_states are computed based
-                # on the "older" target_net; selecting their best reward with max(1).values
-                # This is merged based on the mask, such that we'll have either the expected
-                # state value or 0 in case the state was final.
-                next_state_values = torch.zeros(BATCH_SIZE, device=device)
-                with torch.no_grad():
-                    next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
-                # Compute the expected Q values
-                expected_state_action_values = (next_state_values * GAMMA) + reward_batch
-
-                # Compute Huber loss
-                criterion = nn.SmoothL1Loss()
-                loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
-
-                # Optimize the model
-                optimizer.zero_grad()
-                loss.backward()
-                # In-place gradient clipping
-                torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
-                optimizer.step()
-
+            counterrrrr = 0
             while current_game:
-
+                counterrrrr += 1
                 # TODO: check inputs for select_action
                 # We update the model in select actoin
                 action = select_action(state, env, policy_net)
-                print("actoin", action.item())
                 # TODO: adept step to return certain items.
                 # What should every type be, what do we need in terminated, truncated
                 # Why do we return these variables instead of just checking them through the object
@@ -502,12 +509,10 @@ if __name__ == "__main__":
                 
                 reward = torch.tensor([reward], device=device)
                 done = terminated or truncated
-
                 if terminated:
                     next_state = None
                 else:
                     next_state = torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
-
                 memory.push(state, action, next_state, reward)
 
                 state = next_state
@@ -520,18 +525,15 @@ if __name__ == "__main__":
                     target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key] * (1-TAU)
                 target_net.load_state_dict(target_net_state_dict)
                 if done:
-                    print(" we get here")
-                    episode_durations.append(t + 1)
-                    plot_durations()
+                    episode_durations.append(counterrrrr + 1)
+                    plot_durations(False, episode_durations)
                     break
-        
             #all_replays.append(env.history)
             #replay_per_run = store_replay(all_replays)
-            
-            print("Finished")
-            plot_durations(show_result=True)
-            plt.ioff()
-            plt.show()
+        
+        plot_durations(show_result=True)
+        plt.ioff()
+        plt.show()
 
     elif MODE == "player":
         current_game = True
@@ -545,10 +547,12 @@ if __name__ == "__main__":
 
     elif MODE == "view":
         
-        FILENAME = "replays/rpl0-20240717-201542.csv"
+        FILENAME = "replays/rpl0-20240804-172506.csv"
         coordinates, moves = read_replay(FILENAME)
         #TODO: use enumerate
         for i in range(0, len(moves)):
+            print(moves[i])
+            print("weee", coordinates[i], env.car.position)
             env.step(moves[i])
 
 
