@@ -11,8 +11,7 @@ if __name__ == "__main__":
 
     rewardd = 0
 
-    #while current_game:
-    for j in range(0, 10000):
+    while current_game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 current_game = False     
