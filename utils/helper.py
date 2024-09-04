@@ -32,6 +32,12 @@ def read_replay(file_name):
     return df
 
 def plot_durations(episode_durations):
+    """
+        Shows a plot during training.
+
+    Args:
+        episode_durations (_type_): _description_
+    """
     plt.figure(1)
     durations_t = torch.tensor(episode_durations, dtype=torch.float)
     plt.clf()
