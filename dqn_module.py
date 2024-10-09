@@ -5,17 +5,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from collections import namedtuple, deque
-import math
-import random
-from collections import namedtuple, deque
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-
-# TODO:
-# https://github.com/CodeAndAction/DDQN-Car-Racing/blob/main/ddqn_keras.py
-# split better, create class dqn-racer or something add stuff 
 
 Transition = namedtuple('Transition',
         ('state', 'action', 'next_state', 'reward'))
@@ -37,6 +26,8 @@ class ReplayMemory(object):
 
 class DQNagent():
 
+    #TODO: add comments
+
     def __init__(self, device, batch_size, n_observations, n_actions, gamma, eps_end, eps_start, decay, lr, tau):
         self.policy_net = DQN(n_observations, n_actions).to(device)
         self.target_net = DQN(n_observations, n_actions).to(device)
@@ -55,20 +46,19 @@ class DQNagent():
     def push_memory(self, state, action, next_state, reward):
         self.memory.push(state, action, next_state, reward)
 
-    def select_action(self, state, env):
-        #maybe remove global
-        global steps_done
+    def select_action(self, state, env, training=False):
         sample = random.random()
         eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * \
             math.exp(-1. * self.steps_done / self.eps_decay)
         self.steps_done += 1
-        if sample > eps_threshold:
+        if sample > eps_threshold or training is False:
             with torch.no_grad():
-                # t.max(1) will return the largest column value of each row.
-                # second column on max result is index of where max element was
-                # found, so we pick action with the larger expected reward.
+            # t.max(1) will return the largest column value of each row.
+            # second column on max result is index of where max element was
+            # found, so we pick action with the larger expected reward.
                 return self.policy_net(state).max(1).indices.view(1, 1)
         else:
+           # print("apiowdjwpoijd")
             return torch.tensor([[env.sample()]], device=self.device, dtype=torch.long)
 
     def update_param(self):
@@ -102,7 +92,8 @@ class DQNagent():
             next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1).values
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
-
+        
+        #TODO: make loss function a param?
         #criterion = nn.SmoothL1Loss()
         criterion = nn.MSELoss()
         loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
@@ -113,17 +104,25 @@ class DQNagent():
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
 
+    def save(self, name):
+        #TODO maybe give string for name
+        torch.save(self.policy_net.state_dict(), "saved_models/someusefulname_" + str(name) + ".pth")
+
+    def load(self, file_name):
+        #TODO: need a file with param to match the pth
+        self.policy_net.load_state_dict(torch.load(file_name))
+        self.policy_net.eval()
 
 class DQN(nn.Module):
 
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_observations, 256)
-        self.layer2 = nn.Linear(256, 256)
-        self.layer3 = nn.Linear(256, n_actions)
+        self.layer1 = nn.Linear(n_observations, 32)
+        #self.layer2 = nn.Linear(32, 32)
+        self.layer3 = nn.Linear(32, n_actions)
 
     def forward(self, x):
         x = F.relu(self.layer1(x))
-        x = F.relu(self.layer2(x))
+        #x = F.relu(self.layer2(x))
         return self.layer3(x)
 
