@@ -1,7 +1,6 @@
 import pygame.freetype
 from game_env import Environment
 import torch
-import torch
 from dqn_module import DQNagent
 from game_env import Environment
 
@@ -31,23 +30,48 @@ if __name__ == "__main__":
     current_game = True
 
     dqn_agent = DQNagent(device, BATCH_SIZE, N_OBSERVATIONS, N_ACTIONS, GAMMA, EPS_END, EPS_START, EPS_DECAY, LR, TAU)
-    file_name = "saved_models/someusefulname_311_21.83.pth"
-    dqn_agent.load(file_name)
+    dqn_agent2 = DQNagent(device, BATCH_SIZE, N_OBSERVATIONS, N_ACTIONS, GAMMA, EPS_END, EPS_START, EPS_DECAY, LR, TAU)
     
+    file_name = "saved_models/someusefulname_306_27.41.pth"
+    file_name2 = "saved_models/someusefulname_311_21.83.pth"
+    dqn_agent.load(file_name)
+    dqn_agent2.load(file_name2)
+    all_agents = [dqn_agent, dqn_agent2]
 
-    env = Environment("player")
+    MAP = "track 1"
+    START_POS = "static"
+    NUMBER_OF_PLAYERS = 2
+    env = Environment("player", "track 1", START_POS, NUMBER_OF_PLAYERS)
     state = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+
+    apwojd = 0
+
     while current_game:
         #for event in pygame.event.get():
         #    if event.type == pygame.QUIT:
         #        current_game = False     
         #        break
+        if apwojd == 0:
+            all_states = [state, state]
+        apwojd = 1
+
+        all_actions = []
         
-        action = dqn_agent.select_action(state, env, False)
-        observation, reward, terminated, truncated = env.step(action.item())
+        for i, agent in enumerate(all_agents):
+            action = agent.select_action(all_states[i][0], env, False)
+            all_actions.append(action.item())
         
-        if terminated:
-            current_game = False
-        
-        state = torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
+             
+        #observation, reward, terminated, truncated = env.step(all_actions)[0]
+        all_received = env.step(all_actions)
+
+        all_states = []
+        for i in all_received:
+            
+            observation, reward, terminated, truncated = i
+            if terminated:
+                current_game = False
+
+            state = torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
+            all_states.append(state)
