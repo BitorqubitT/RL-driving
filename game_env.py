@@ -9,20 +9,14 @@ from car import Car
 """
     This contains the game environment for a simple car racing game.
     The graphics are seperated from the game logic.
-    TODO: Check how to write good intro, name the different classes?
-
+    TODO: Write docstring
 
     --------------------------------------------------------------
-- On my pc:
-	- make sure i saved old structure somewhere
-- Change to new structure and remove old stuff
 - remove the car hitbox and car logic
 - Use the raytracers to calculate if we hit a wall.
 - For each angle calculate the distance to hit is. (this is based on car size)
     - If we go under this value then hit wall
 - Check how we deal with checkpoints
-
-
 - Get main.py working for training.
 - Perform old training and try to get the same results as before.
 	- Save and test these
@@ -31,7 +25,6 @@ from car import Car
 - Better way to save params, add start pos info and network info etc.
 - Check self play + reward etc
 - Clean run inference
-
 
 """
 
