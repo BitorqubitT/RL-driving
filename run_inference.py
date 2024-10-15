@@ -10,11 +10,7 @@ from game_env import Environment
     Run the game.
 """
 
-#TODO:
-# Get the network action selection working
-
 if __name__ == "__main__":
-
 
     device = "cuda"
     BATCH_SIZE = 256
@@ -52,6 +48,8 @@ if __name__ == "__main__":
         #    if event.type == pygame.QUIT:
         #        current_game = False     
         #        break
+
+        #TODO: Clean this up
         if apwojd == 0:
             all_states = [state, state]
         apwojd = 1
@@ -61,15 +59,14 @@ if __name__ == "__main__":
         for i, agent in enumerate(all_agents):
             action = agent.select_action(all_states[i][0], env, False)
             all_actions.append(action.item())
-        
-             
-        #observation, reward, terminated, truncated = env.step(all_actions)[0]
-        all_received = env.step(all_actions)
+
+        #All observations, rewards, status
+        all_car_data = env.step(all_actions)
 
         all_states = []
-        for i in all_received:
+        for car_data in all_car_data:
             
-            observation, reward, terminated, truncated = i
+            observation, reward, terminated, truncated = car_data
             if terminated:
                 current_game = False
 
