@@ -32,79 +32,23 @@ class Car(Sprite):
         self.position  = pygame.math.Vector2(x, y)
         self.player_type = player_type
         self.state = []
+        self.hitbox_distances = self._load_hitbox_ranges()
         if self.player_type != "ai":
             self.rot_img = self._load_rotated_images(car_image)
             self.image   = self.rot_img[0]
             self.rect    = self.image.get_rect()
             self.mask    = pygame.mask.from_surface(self.image)
-
-    def create_car_logic(self):
-        # TODO: clean this function
-        """ 
-            Car is basically 4 points and we create a hitbox.
-            We have a position x,y
-            From this we calculate the 4 edge points based on size image
-            Then we calculate 4 lines around the car
-            This way we can always calculate if the car hits the walls
-            put some of these in util
-        """
-        # Given center position of the object
-        x, y = self.position[0], self.position[1]  # Example coordinates
-        width, height = 64, 30
-        angle_degrees = self.heading  # Example angle in degrees
-
-        # Convert angle to radians
-        angle_radians = angle_degrees
-
-        # Calculate half-width and half-height
-        half_width = width / 2
-        half_height = height / 2
-
-        # Calculate the corners relative to the center
-        corners = [
-            (-half_width, -half_height),
-            (half_width, -half_height),
-            (-half_width, half_height),
-            (half_width, half_height)
-        ]
-
-        # Calculate the rotated corner positions
-        rotated_corners = [rotate_point(px, py, angle_radians) for px, py in corners]
-
-        # Translate the rotated corners back to the original center
-        translated_corners = [(x + px, y + py) for px, py in rotated_corners]
-
-        # Print the corner positions
-        translated_corners = [translated_corners[1], translated_corners[3], translated_corners[2], translated_corners[0]]
-
-        return translated_corners
     
     def calculate_hitboxes(self) -> list:
-        # TODO: find easier way to calc a box
-        # Front, front_T, back_T, back_b       
-        corners = self.create_car_logic()
-        hitboxes = [[corners[0], corners[1]],
-                    [corners[1], corners[2]],
-                    [corners[2], corners[3]],
-                    [corners[3], corners[0]]]
+        """ We check if we are too close to the wall based on the sensors"""
 
-        #maybe check distance between points.
-        hitbox_points = []
-        for distance, point_pair in enumerate(hitboxes):
-            #TODO: REPLACE GARBAGE CODE
-            angle = calculate_angle(point_pair[0], point_pair[1])
-            # Set range based on distance between points
-            # We know this because of the size of the car.
-            if distance == 0 or distance == 2:
-                # TODO:Set these to height of car
-                range_set = 30
-            if distance == 1 or distance == 3:
-                # TODO:Set these to length of car
-                range_set = 64
-            for i in range(0, range_set):
-                x = round(point_pair[0][0] + math.cos(angle) * i)
-                y = round(point_pair[0][1] + math.sin(angle) * i)
-                hitbox_points.append((x, y))
+        hitbox_points = 0
+        ray_angles = [0, 1.570, 4.712, 0.524, 5.76, 3.142, 3.67, 2.618]
+        # convert to radians?
+        #32 or 15 if right angle
+        # check tomorrow
+
+
         return hitbox_points
 
     def _load_rotated_images(self, car_image: str) -> list:
@@ -157,6 +101,7 @@ class Car(Sprite):
     def distance_to_walls(self, walls) -> list:
         ray_angles = [0, 1.570, 4.712, 0.524, 5.76, 3.142, 3.67, 2.618]
         distances = []
+        realdis = []
         all_position = []
         #TODO: CAN USE THE SAME TACTIC HOW I USE detect wall detection
         # Check where there is overlap and stop there
@@ -168,9 +113,49 @@ class Car(Sprite):
             all_position.append((x, y))
             # We use distance for the sensors
             distance_to_wall = math.sqrt((x - self.position[0]) ** 2 + (y - self.position[1]) ** 2)
+            print(self.position, "", x, "", y, distance_to_wall)
+            realdis.append(distance_to_wall)
             distances.append((1500 - distance_to_wall) / 1500)
+        print(distances)
         return distances, all_position
     
+    def hitbox_distances(self) -> list:
+
+        # start position
+        # calc pos of car edges
+        # cast all rays and get intersection point
+        # calc distances
+            # check these
+        # save d in hitbox
+        # check if distances ever goes under
+
+        x, y = self.start_pos()
+        #30,30
+        all_hitboxes = []
+
+        start_x = x - 15
+        start_y = y - 32
+
+        for w in range(0, 60):
+            all_hitboxes.append((start_x, start_y + w))
+            all_hitboxes.append((start_x + 30, start_y + w))
+
+        for h in range(0, 30):
+            all_hitboxes.append((start_x + h, start_y))
+            all_hitboxes.append((start_x + h, start_y + 60))
+
+
+        # now calc each ray
+        # When do we hit hitbox
+        # calc ditance
+        all_distances = self.distance_to_walls(all_hitboxes)
+
+
+
+        return hitbox_dis
+
+
+
     def check_checkpoint(self, checkpoints) -> bool:
         return is_point_on_line(checkpoints[0][0], checkpoints[0][1], (round(self.position[0]), round(self.position[1])))
 
@@ -193,7 +178,7 @@ class Car(Sprite):
         self.heading = 0
 
     def action(self, keys) -> None:
-        if self.player_type == "plaayer":
+        if self.player_type == "player":
             if keys[pygame.K_UP]:
                 self._accelerate(1.0)
             if keys[pygame.K_DOWN]:
