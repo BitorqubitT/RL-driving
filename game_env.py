@@ -96,15 +96,15 @@ class Environment():
 
             # Create a list with map values at hitbox position.
             # AKA check if wall was found
-            car_hitboxes = carr.calculate_hitboxes()
-            car_hitboxes_transposed = np.array(car_hitboxes).T.tolist()
+            #car_hitboxes = carr.calculate_hitboxes()
+            #car_hitboxes_transposed = np.array(car_hitboxes).T.tolist()
             # Get overlap between the positions of walls and the car hitboxes
 
-            if True in self.walls[tuple(car_hitboxes_transposed)]:
+            #if True in self.walls[tuple(car_hitboxes_transposed)]:
                 # Add a penalty for hitting a wall
-                reward -= 1
-                carr.reset()
-                hit_wall_check = False
+                #reward -= 1
+                #carr.reset()
+                #hit_wall_check = False
 
             if carr.check_checkpoint(self.checkpoints):
                 #TODO: How to fix this?????
