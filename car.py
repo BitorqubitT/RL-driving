@@ -32,25 +32,14 @@ class Car(Sprite):
         self.position  = pygame.math.Vector2(x, y)
         self.player_type = player_type
         self.state = []
-        self.hitbox_distances = self._load_hitbox_ranges()
+        self.hitbox_distances = self._load_hitbox_distances()
+        self.hitwall = False
         if self.player_type != "ai":
             self.rot_img = self._load_rotated_images(car_image)
             self.image   = self.rot_img[0]
             self.rect    = self.image.get_rect()
             self.mask    = pygame.mask.from_surface(self.image)
-    
-    def calculate_hitboxes(self) -> list:
-        """ We check if we are too close to the wall based on the sensors"""
-
-        hitbox_points = 0
-        ray_angles = [0, 1.570, 4.712, 0.524, 5.76, 3.142, 3.67, 2.618]
-        # convert to radians?
-        #32 or 15 if right angle
-        # check tomorrow
-
-
-        return hitbox_points
-
+  
     def _load_rotated_images(self, car_image: str) -> list:
         car_image = pygame.image.load(car_image).convert_alpha()
         rotated_images = []
@@ -84,7 +73,6 @@ class Car(Sprite):
         if (abs(self.speed) < 0.1):
             self.speed = 0
 
-    #TODO: efficiency
     def _cast_ray(self, arr, angle_offset) -> None:
         #TODO: SEE COMMENTS IN DISTANCE TO WALLS FUNCTIONS
         x, y = 0, 0
@@ -113,48 +101,45 @@ class Car(Sprite):
             all_position.append((x, y))
             # We use distance for the sensors
             distance_to_wall = math.sqrt((x - self.position[0]) ** 2 + (y - self.position[1]) ** 2)
-            print(self.position, "", x, "", y, distance_to_wall)
             realdis.append(distance_to_wall)
             distances.append((1500 - distance_to_wall) / 1500)
-        print(distances)
         return distances, all_position
+
+    # TODO: make private
+    def wall_collision(self) -> bool:
+        for i, dis in enumerate(self.hitbox_distances):
+            if dis <= self.state[0][i]:
+                self.hitwall = True
+        return
     
-    def hitbox_distances(self) -> list:
-
-        # start position
-        # calc pos of car edges
-        # cast all rays and get intersection point
-        # calc distances
-            # check these
-        # save d in hitbox
-        # check if distances ever goes under
-
-        x, y = self.start_pos()
-        #30,30
+    def _load_hitbox_distances(self) -> list:
+        x, y = self.start_pos
         all_hitboxes = []
+        hitboxes = np.zeros((1920,1080), dtype=bool)
 
-        start_x = x - 15
-        start_y = y - 32
+        #TODO; take width and height of image
+        start_x = x - 32
+        start_y = y - 15
 
-        for w in range(0, 60):
-            all_hitboxes.append((start_x, start_y + w))
-            all_hitboxes.append((start_x + 30, start_y + w))
+        for w in range(0, 64):
+            all_hitboxes.append((start_x + w, start_y))
+            all_hitboxes.append((start_x + w, start_y + 30))
+            hitboxes[start_x + w, start_y] = True
+            hitboxes[start_x + w, start_y + 30] = True
 
         for h in range(0, 30):
-            all_hitboxes.append((start_x + h, start_y))
-            all_hitboxes.append((start_x + h, start_y + 60))
+            all_hitboxes.append((start_x, start_y + h))
+            all_hitboxes.append((start_x + 64, start_y + h))
+            hitboxes[start_x, start_y + h] = True
+            hitboxes[start_x + 64, start_y + h] = True
 
-
-        # now calc each ray
-        # When do we hit hitbox
-        # calc ditance
-        all_distances = self.distance_to_walls(all_hitboxes)
-
-
-
-        return hitbox_dis
-
-
+        all_distances, __ = self.distance_to_walls(hitboxes)
+        all_distances_new = []
+        for i in all_distances:
+            all_distances_new.append(abs((i*1500) - 1500))
+        #print(all_distances)
+        #print(type(all_distances))
+        return all_distances
 
     def check_checkpoint(self, checkpoints) -> bool:
         return is_point_on_line(checkpoints[0][0], checkpoints[0][1], (round(self.position[0]), round(self.position[1])))
@@ -169,6 +154,8 @@ class Car(Sprite):
         self.state.append(distances)
         if self.player_type != "ai":
             self.rect.center = (round(self.position[0]), round(self.position[1]))
+        self.wall_collision()
+
 
     def reset(self) -> None:
         #self.image = self.rot_img[0]
@@ -176,9 +163,10 @@ class Car(Sprite):
         self.velocity  = pygame.math.Vector2(0, 0)
         self.speed = 0
         self.heading = 0
+        self.hitwall = False
 
     def action(self, keys) -> None:
-        if self.player_type == "player":
+        if self.player_type == "plaayer":
             if keys[pygame.K_UP]:
                 self._accelerate(1.0)
             if keys[pygame.K_DOWN]:
