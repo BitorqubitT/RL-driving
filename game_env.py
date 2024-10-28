@@ -10,22 +10,10 @@ from car import Car
     This contains the game environment for a simple car racing game.
     The graphics are seperated from the game logic.
     TODO: Write docstring
-
-    --------------------------------------------------------------
-- remove the car hitbox and car logic
-- Use the raytracers to calculate if we hit a wall.
-- For each angle calculate the distance to hit is. (this is based on car size)
-    - If we go under this value then hit wall
-- Check how we deal with checkpoints
-- Get main.py working for training.
-- Perform old training and try to get the same results as before.
-	- Save and test these
-	- If we manage to get this performance than save this
 		- Still sucks i removed old results
 - Better way to save params, add start pos info and network info etc.
 - Check self play + reward etc
 - Clean run inference
-
 """
 
 class Environment():
@@ -70,9 +58,9 @@ class Environment():
                 self.car_group.add(car)
 
             car.update(self.walls)
-            #self.checkpoints = self._set_checkpoints()
-            #self.checkpoint_counter = 0
-
+            self.checkpoints = self._set_checkpoints()
+            self.checkpoint_counter = 0
+        # TODO: kinda cheek
         return car.state
     
     def sample(self):
@@ -87,24 +75,16 @@ class Environment():
         return_per_car = []    
 
         for i, carr in enumerate(self.cars):
-
             carr.action(all_keys[i])
             reward = 0
             carr.update(self.walls)
             hit_wall_check = False
             finished = False
 
-            # Create a list with map values at hitbox position.
-            # AKA check if wall was found
-            #car_hitboxes = carr.calculate_hitboxes()
-            #car_hitboxes_transposed = np.array(car_hitboxes).T.tolist()
-            # Get overlap between the positions of walls and the car hitboxes
-
-            #if True in self.walls[tuple(car_hitboxes_transposed)]:
-                # Add a penalty for hitting a wall
-                #reward -= 1
-                #carr.reset()
-                #hit_wall_check = False
+            if carr.hitwall is True:
+                reward -= 1
+                carr.reset()
+                hit_wall_check = True
 
             if carr.check_checkpoint(self.checkpoints):
                 #TODO: How to fix this?????
@@ -113,13 +93,11 @@ class Environment():
                 self.checkpoint_counter += 1
                 self.checkpoints.append(self.checkpoints[0])
                 self.checkpoints.pop(0)
-            
+
             if self.checkpoint_counter == len(self.checkpoints):
                 reward += 40
                 self.checkpoint_counter = 0
-
             return_per_car.append([carr.state, reward, hit_wall_check, finished])
-        
         return return_per_car
         
     def render(self) -> None:
@@ -128,7 +106,6 @@ class Environment():
         #elf.car_group.update()
         self.track_group.draw(self.window)
         self.car_group.draw(self.window)
-        
         pygame.display.flip()
         return None
 
@@ -147,7 +124,6 @@ class Environment():
         file.close()
         return checkpoints
     
-    # easy way to get the position of the track walls
     def _get_walls(self) -> np.array:
         track = "track_info\\" + self.map + ".csv"
         return np.genfromtxt(track, delimiter=',', dtype = bool).reshape(1920, 1080)
