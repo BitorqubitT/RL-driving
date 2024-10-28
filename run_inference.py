@@ -1,4 +1,3 @@
-import pygame.freetype
 from game_env import Environment
 import torch
 from dqn_module import DQNagent
@@ -28,8 +27,8 @@ if __name__ == "__main__":
     dqn_agent = DQNagent(device, BATCH_SIZE, N_OBSERVATIONS, N_ACTIONS, GAMMA, EPS_END, EPS_START, EPS_DECAY, LR, TAU)
     dqn_agent2 = DQNagent(device, BATCH_SIZE, N_OBSERVATIONS, N_ACTIONS, GAMMA, EPS_END, EPS_START, EPS_DECAY, LR, TAU)
     
-    file_name = "saved_models/someusefulname_306_27.41.pth"
-    file_name2 = "saved_models/someusefulname_311_21.83.pth"
+    file_name = "saved_models/someusefulname_newmodel248_40.2.pth"
+    file_name2 = "saved_models/someusefulname_newmodel311_36.76.pth"
     dqn_agent.load(file_name)
     dqn_agent2.load(file_name2)
     all_agents = [dqn_agent, dqn_agent2]
@@ -40,14 +39,9 @@ if __name__ == "__main__":
     env = Environment("player", "track 1", START_POS, NUMBER_OF_PLAYERS)
     state = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
-
     apwojd = 0
 
     while current_game:
-        #for event in pygame.event.get():
-        #    if event.type == pygame.QUIT:
-        #        current_game = False     
-        #        break
 
         #TODO: Clean this up
         if apwojd == 0:
@@ -60,7 +54,6 @@ if __name__ == "__main__":
             action = agent.select_action(all_states[i][0], env, False)
             all_actions.append(action.item())
 
-        #All observations, rewards, status
         all_car_data = env.step(all_actions)
 
         all_states = []
