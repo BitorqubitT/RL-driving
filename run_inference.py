@@ -27,8 +27,8 @@ if __name__ == "__main__":
     dqn_agent = DQNagent(device, BATCH_SIZE, N_OBSERVATIONS, N_ACTIONS, GAMMA, EPS_END, EPS_START, EPS_DECAY, LR, TAU)
     dqn_agent2 = DQNagent(device, BATCH_SIZE, N_OBSERVATIONS, N_ACTIONS, GAMMA, EPS_END, EPS_START, EPS_DECAY, LR, TAU)
     
-    file_name = "saved_models/someusefulname_newmodel248_40.2.pth"
-    file_name2 = "saved_models/someusefulname_newmodel311_36.76.pth"
+    file_name = "saved_models/someusefulname_64_randomspawn_track151_54.12.pth"
+    file_name2 = "saved_models/someusefulname_64_randomspawn_track151_54.12.pth"
     dqn_agent.load(file_name)
     dqn_agent2.load(file_name2)
     all_agents = [dqn_agent, dqn_agent2]
