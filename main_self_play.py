@@ -11,9 +11,10 @@ if __name__ == "__main__":
     MODE = "player"
     #TODO: fix start point
     MAP_NAMES = ["scuffed monza", "track 1"]
-    START_POS = [[(),(),()], [(), (), ()]]
-    MAP = MAP_NAMES[1]
-    env = Environment(MODE, MAP, START_POS)
+    MAP = "track 1"
+    START_POS = "random"
+    NUMBER_OF_PLAYERS = 1
+    env = Environment(MODE, MAP, START_POS, NUMBER_OF_PLAYERS)
 
     current_game = True
     rewardd = 0
@@ -27,8 +28,9 @@ if __name__ == "__main__":
                 break
         
         # Add the buttons here for selfplay
-        
         keys = pygame.key.get_pressed()
-        distance, reward, z, zzz = env.step(keys)
+        keys = [keys]
+        observation, reward, terminated, truncated = env.step(keys)[0]
         rewardd += reward
-        print(reward)
+        
+        print(rewardd)
