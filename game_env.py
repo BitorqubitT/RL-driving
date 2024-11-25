@@ -18,13 +18,14 @@ from car import Car
 
 class Environment():
     """load and update the game, take in actions, keep score"""
-    def __init__(self, mode: str, map: str, start_pos: tuple, number_of_players: int):
+    def __init__(self, mode: str, map: str, start_pos: str, number_of_players: int):
         self.action_space = np.array([0, 1, 2, 3])
         self.cars = []
         self.reward = []
         self.mode = mode
         self.map = map
         self.checkpoint_counter = 0
+        self.last_checkpoint = []
         self.start_pos = start_pos
         self.walls = self._get_walls()
         self.checkpoints = self._set_checkpoints()
@@ -43,16 +44,28 @@ class Environment():
         self.car_group = pygame.sprite.Group()
         self.track_group = self._load_obstacles()
 
-        # track 2 950, 100
-        # track 1 750, 200
     def reset(self) -> None:
         self.cars = []
         for i in range(0, self.number_of_players):
-            # TODO: Starting pos, depends on:
-            # Map, training style
-            # Keep for now, but change this within this function, based on map load start pos or something.
-            # Param with alternate spawns?
-            car = Car("assets/car12.png", 550, 125, self.mode)
+            if self.start_pos == "random":
+                # load start_pos
+                # use random mode to select position
+                # can drive around in the game to come up with different random points + headings
+                # If heading is give, use that but default is 0
+                pos = random.choice([(550, 125, 0), 
+                                     (1562, 291, 1.46), 
+                                     (1514, 591, 1.78), 
+                                     (1531, 860, 1.36), 
+                                     (1168, 956, 3.24), 
+                                     (610, 942, 3.246), 
+                                     (239, 681, 4.39), 
+                                     (236, 459, 4.92), 
+                                     (223, 279, 4.9), 
+                                     (363, 129, 5.759)])
+            else:
+                pos = (550, 125, 0)
+            car = Car("assets/car12.png", pos[0], pos[1], pos[2], self.mode)
+            #car = Car("assets/car12.png", 550, 125, self.mode)
             self.cars.append(car)
             if self.mode == "player":
                 self.car_group.add(car)
@@ -60,7 +73,6 @@ class Environment():
             car.update(self.walls)
             self.checkpoints = self._set_checkpoints()
             self.checkpoint_counter = 0
-        # TODO: kinda cheek
         return car.state
     
     def sample(self):
@@ -72,8 +84,7 @@ class Environment():
         if self.mode != "ai":
             self.render()
 
-        return_per_car = []    
-
+        return_per_car = []
         for i, carr in enumerate(self.cars):
             carr.action(all_keys[i])
             reward = 0
@@ -83,21 +94,34 @@ class Environment():
 
             if carr.hitwall is True:
                 reward -= 1
-                carr.reset()
+                #carr.reset()
                 hit_wall_check = True
 
-            if carr.check_checkpoint(self.checkpoints):
-                #TODO: How to fix this?????
-                #Dont use this during inference right>
-                reward += 1
-                self.checkpoint_counter += 1
-                self.checkpoints.append(self.checkpoints[0])
-                self.checkpoints.pop(0)
+            # TODO: check if there is a cleaner way of doing this.
 
-            if self.checkpoint_counter == len(self.checkpoints):
-                reward += 40
-                self.checkpoint_counter = 0
+            all_checkpoints_checked = []
+
+            # We don't check score when doing inference
+            if self.mode == "ai" or self.mode == "player":
+                for i in self.checkpoints:
+                    #print(i)
+                    all_checkpoints_checked.append(carr.check_checkpoint(i))
+
+                if True in all_checkpoints_checked:
+                    find_index = all_checkpoints_checked.index(True)
+
+                    if self.last_checkpoint != self.checkpoints[find_index]:
+                        reward += 1
+                        self.last_checkpoint = self.checkpoints[find_index]
+
+                #TODO: CHeck if we need something like this
+                #if self.checkpoint_counter == len(self.checkpoints):
+                #   reward += 40
+                #  self.checkpoint_counter = 0
             return_per_car.append([carr.state, reward, hit_wall_check, finished])
+            if hit_wall_check is True:
+                carr.reset()
+
         return return_per_car
         
     def render(self) -> None:
