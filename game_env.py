@@ -18,7 +18,7 @@ from car import Car
 
 class Environment():
     """load and update the game, take in actions, keep score"""
-    def __init__(self, mode: str, map: str, start_pos: str, number_of_players: int):
+    def __init__(self, mode: str, map: str, start_pos: str, number_of_players: int, start_locations):
         self.action_space = np.array([0, 1, 2, 3])
         self.cars = []
         self.reward = []
@@ -26,6 +26,8 @@ class Environment():
         self.map = map
         self.checkpoint_counter = 0
         self.last_checkpoint = []
+        # give data class or something
+        self.start_locations = #data_holder.get_data(map)
         self.start_pos = start_pos
         self.walls = self._get_walls()
         self.checkpoints = self._set_checkpoints()
@@ -52,6 +54,10 @@ class Environment():
                 # use random mode to select position
                 # can drive around in the game to come up with different random points + headings
                 # If heading is give, use that but default is 0
+
+                #pos = random.choice(self.start_locations)
+
+                #TODO: remove
                 pos = random.choice([(550, 125, 0), 
                                      (1562, 291, 1.46), 
                                      (1514, 591, 1.78), 
@@ -63,9 +69,9 @@ class Environment():
                                      (223, 279, 4.9), 
                                      (363, 129, 5.759)])
             else:
+                #pos = self.start_locations[0]
                 pos = (550, 125, 0)
             car = Car("assets/car12.png", pos[0], pos[1], pos[2], self.mode)
-            #car = Car("assets/car12.png", 550, 125, self.mode)
             self.cars.append(car)
             if self.mode == "player":
                 self.car_group.add(car)
