@@ -5,20 +5,36 @@ import ast
 import numpy as np
 from level import Level
 from car import Car
-
-"""
-    This contains the game environment for a simple car racing game.
-    The graphics are seperated from the game logic.
-    TODO: Write docstring
-		- Still sucks i removed old results
-- Better way to save params, add start pos info and network info etc.
-- Check self play + reward etc
-- Clean run inference
-"""
+from dataclass_helper import SpawnHolder
+import os
 
 class Environment():
-    """load and update the game, take in actions, keep score"""
-    def __init__(self, mode: str, map: str, start_pos: str, number_of_players: int, start_locations):
+    """Load and update the game, take in actions, and keep score.
+
+    Attributes:
+        action_space (np.ndarray): The possible actions.
+        cars (list): The list of car objects.
+        reward (list): The list of rewards.
+        mode (str): The mode of the game ('ai' or 'player').
+        map (str): The map of the game.
+        checkpoint_counter (int): The counter for checkpoints.
+        last_checkpoint (list): The last checkpoint reached.
+        start_locations (SpawnHolder): The start locations for the cars.
+        start_pos (str): The starting position of the cars.
+        walls (np.ndarray): The array representing the walls.
+        checkpoints (list): The list of checkpoints.
+        number_of_players (int): The number of players.
+    """
+    
+    def __init__(self, mode: str, map: str, start_pos: str, number_of_players: int):
+        """Initializes the Environment object.
+
+        Args:
+            mode (str): The mode of the game ('ai' or 'player').
+            map (str): The map of the game.
+            start_pos (str): The starting position of the cars.
+            number_of_players (int): The number of players.
+        """
         self.action_space = np.array([0, 1, 2, 3])
         self.cars = []
         self.reward = []
@@ -26,8 +42,7 @@ class Environment():
         self.map = map
         self.checkpoint_counter = 0
         self.last_checkpoint = []
-        # give data class or something
-        self.start_locations = #data_holder.get_data(map)
+        self.start_locations = self._load_start_locations()
         self.start_pos = start_pos
         self.walls = self._get_walls()
         self.checkpoints = self._set_checkpoints()
@@ -46,47 +61,59 @@ class Environment():
         self.car_group = pygame.sprite.Group()
         self.track_group = self._load_obstacles()
 
+    def _load_start_locations(self):
+        """Load the start locations for the cars.
+
+        Returns:
+            SpawnHolder: The start locations for the cars.
+        """
+        spawnpoints = SpawnHolder()
+        if self.map == "all":
+            for maps in os.listdir("/spawn_info"):
+                maps = maps.replace(".csv", "")
+                spawnpoints.load_data_from_file(maps)
+        else:
+            spawnpoints.load_data_from_file(self.map)
+        return spawnpoints
+
     def reset(self) -> None:
+        """Reset the environment to its initial state.
+
+        Returns:
+            list: The state of the car.
+        """
         self.cars = []
         for i in range(0, self.number_of_players):
             if self.start_pos == "random":
-                # load start_pos
-                # use random mode to select position
-                # can drive around in the game to come up with different random points + headings
-                # If heading is give, use that but default is 0
-
-                #pos = random.choice(self.start_locations)
-
-                #TODO: remove
-                pos = random.choice([(550, 125, 0), 
-                                     (1562, 291, 1.46), 
-                                     (1514, 591, 1.78), 
-                                     (1531, 860, 1.36), 
-                                     (1168, 956, 3.24), 
-                                     (610, 942, 3.246), 
-                                     (239, 681, 4.39), 
-                                     (236, 459, 4.92), 
-                                     (223, 279, 4.9), 
-                                     (363, 129, 5.759)])
+                pos = random.choice(self.start_locations.get_data(self.map))
             else:
-                #pos = self.start_locations[0]
-                pos = (550, 125, 0)
+                pos = self.start_locations.get_data(self.map)[0]
             car = Car("assets/car12.png", pos[0], pos[1], pos[2], self.mode)
             self.cars.append(car)
             if self.mode == "player":
                 self.car_group.add(car)
-
             car.update(self.walls)
             self.checkpoints = self._set_checkpoints()
             self.checkpoint_counter = 0
         return car.state
     
     def sample(self):
+        """Sample a random action from the action space.
+
+        Returns:
+            int: A random action.
+        """
         return random.choice(self.action_space)
 
     def step(self, all_keys: list) -> None:
+        """Take a step in the environment.
 
-        #TODO: Shouldn't we get a reward for not crashing and just advancing in the right direction>?
+        Args:
+            all_keys (list): The list of keys pressed for each car.
+
+        Returns:
+            list: The state, reward, hit wall check, and finished status for each car.
+        """
         if self.mode != "ai":
             self.render()
 
@@ -95,58 +122,54 @@ class Environment():
             carr.action(all_keys[i])
             reward = 0
             carr.update(self.walls)
-            hit_wall_check = False
+            hit_wall_check = carr.hitwall
             finished = False
 
-            if carr.hitwall is True:
+            if hit_wall_check:
                 reward -= 1
-                #carr.reset()
-                hit_wall_check = True
 
-            # TODO: check if there is a cleaner way of doing this.
+            all_checkpoints_checked = [carr.check_checkpoint(checkpoint) for checkpoint in self.checkpoints]
 
-            all_checkpoints_checked = []
-
-            # We don't check score when doing inference
-            if self.mode == "ai" or self.mode == "player":
-                for i in self.checkpoints:
-                    #print(i)
-                    all_checkpoints_checked.append(carr.check_checkpoint(i))
-
-                if True in all_checkpoints_checked:
+            if self.mode in {"ai", "player"}:
+                if any(all_checkpoints_checked):
                     find_index = all_checkpoints_checked.index(True)
-
                     if self.last_checkpoint != self.checkpoints[find_index]:
                         reward += 1
                         self.last_checkpoint = self.checkpoints[find_index]
 
-                #TODO: CHeck if we need something like this
-                #if self.checkpoint_counter == len(self.checkpoints):
-                #   reward += 40
-                #  self.checkpoint_counter = 0
+                # Maybe extra reward for whole lap
+
             return_per_car.append([carr.state, reward, hit_wall_check, finished])
-            if hit_wall_check is True:
+            if hit_wall_check:
                 carr.reset()
 
         return return_per_car
-        
+
     def render(self) -> None:
-        #TODO: this one seems extra
+        """Render the game environment."""
         self.window.blit(self.background, (0, 0))
-        #elf.car_group.update()
         self.track_group.draw(self.window)
         self.car_group.draw(self.window)
         pygame.display.flip()
         return None
 
-    # What is returned?
     def _load_obstacles(self) -> None:
+        """Load the obstacles for the track.
+
+        Returns:
+            pygame.sprite.Group: The group of track obstacles.
+        """
         self.track = Level("assets/" + self.map + ".png", 1920//2, 1080//2)
         self.track_group = pygame.sprite.Group()
         self.track_group.add(self.track)
         return self.track_group
     
     def _set_checkpoints(self) -> list:
+        """Set the checkpoints for the track.
+
+        Returns:
+            list: The list of checkpoints.
+        """
         track = "checkpoints/" + self.map + ".txt"
         with open(track, 'r') as file:
             lines = file.readlines()
@@ -155,5 +178,10 @@ class Environment():
         return checkpoints
     
     def _get_walls(self) -> np.array:
+        """Get the walls for the track.
+
+        Returns:
+            np.ndarray: The array representing the walls.
+        """
         track = "track_info\\" + self.map + ".csv"
         return np.genfromtxt(track, delimiter=',', dtype = bool).reshape(1920, 1080)
