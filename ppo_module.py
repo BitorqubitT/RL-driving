@@ -29,6 +29,21 @@ device = (
     if torch.cuda.is_available() and not is_fork
     else torch.device("cpu")
 )
+
+
+#TODO: https://colab.research.google.com/github/pytorch/tutorials/blob/gh-pages/_downloads/4065a985b933a4377d3c7d93557e2282/reinforcement_ppo.ipynb#scrollTo=7v4aeu1vLodx
+# Check what is going wrong with step count
+
+#device = torch.device(
+#    "cuda" if torch.cuda.is_available() else
+#    "mps" if torch.backends.mps.is_available() else
+#    "cpu"
+#)
+
+
+#device = "cuda"
+
+print(device)
 num_cells = 256  # number of cells in each layer i.e. output dim.
 lr = 3e-4
 max_grad_norm = 1.0
@@ -159,7 +174,6 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
     optim, total_frames // frames_per_batch, 0.0
 )
 
-
 logs = defaultdict(list)
 pbar = tqdm(total=total_frames)
 eval_str = ""
@@ -202,15 +216,12 @@ for i, tensordict_data in enumerate(collector):
     logs["lr"].append(optim.param_groups[0]["lr"])
     lr_str = f"lr policy: {logs['lr'][-1]: 4.4f}"
     if i % 10 == 0:
-        # We evaluate the policy once every 10 batches of data.
-        # Evaluation is rather simple: execute the policy without exploration
-        # (take the expected value of the action distribution) for a given
-        # number of steps (1000, which is our ``env`` horizon).
-        # The ``rollout`` method of the ``env`` can take a policy as argument:
-        # it will then execute this policy at each step.
-        with set_exploration_type(ExplorationType.MEAN), torch.no_grad():
-            # execute a rollout with the trained policy
-            eval_rollout = env.rollout(1000, policy_module)
+    # We evaluate the policy once every 10 batches of data.
+    # Instead of using ExplorationType.MEAN, we sample actions and average them:
+        with torch.no_grad():
+            # execute a rollout with the trained policy, sampling actions
+            eval_rollout = env.rollout(1000, policy_module) # Use MODE to sample
+            # OR  eval_rollout = env.rollout(1000, policy_module, exploration_type=lambda td: td['action'])
             logs["eval reward"].append(eval_rollout["next", "reward"].mean().item())
             logs["eval reward (sum)"].append(
                 eval_rollout["next", "reward"].sum().item()
@@ -227,7 +238,6 @@ for i, tensordict_data in enumerate(collector):
     # We're also using a learning rate scheduler. Like the gradient clipping,
     # this is a nice-to-have but nothing necessary for PPO to work.
     scheduler.step()
-
 
 plt.figure(figsize=(10, 10))
 plt.subplot(2, 2, 1)
