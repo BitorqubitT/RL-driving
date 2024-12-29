@@ -1,10 +1,7 @@
-# First test is PPO works on normal environments
 import warnings
 warnings.filterwarnings("ignore")
 from torch import multiprocessing
-
 from collections import defaultdict
-
 import matplotlib.pyplot as plt
 import torch
 from tensordict.nn import TensorDictModule
@@ -29,25 +26,9 @@ device = (
     if torch.cuda.is_available() and not is_fork
     else torch.device("cpu")
 )
-
-
-#TODO: https://colab.research.google.com/github/pytorch/tutorials/blob/gh-pages/_downloads/4065a985b933a4377d3c7d93557e2282/reinforcement_ppo.ipynb#scrollTo=7v4aeu1vLodx
-# Check what is going wrong with step count
-
-#device = torch.device(
-#    "cuda" if torch.cuda.is_available() else
-#    "mps" if torch.backends.mps.is_available() else
-#    "cpu"
-#)
-
-
-#device = "cuda"
-
-print(device)
 num_cells = 256  # number of cells in each layer i.e. output dim.
 lr = 3e-4
 max_grad_norm = 1.0
-
 
 frames_per_batch = 1000
 # For a complete training, bring the number of frames up to 1M
@@ -61,36 +42,6 @@ clip_epsilon = (
 gamma = 0.99
 lmbda = 0.95
 entropy_eps = 1e-4
-
-base_env = GymEnv("InvertedDoublePendulum-v4", device=device)
-
-env = TransformedEnv(
-    base_env,
-    Compose(
-        # normalize observations
-        ObservationNorm(in_keys=["observation"]),
-        DoubleToFloat(),
-        StepCounter(),
-    ),
-)
-
-env.transform[0].init_stats(num_iter=1000, reduce_dim=0, cat_dim=0)
-
-print("normalization constant shape:", env.transform[0].loc.shape)
-
-print("observation_spec:", env.observation_spec)
-print("reward_spec:", env.reward_spec)
-print("input_spec:", env.input_spec)
-print("action_spec (as defined by input_spec):", env.action_spec)
-
-
-check_env_specs(env)
-
-
-rollout = env.rollout(3)
-print("rollout of three steps:", rollout)
-print("Shape of the rollout TensorDict:", rollout.batch_size)
-
 
 actor_net = nn.Sequential(
     nn.LazyLinear(num_cells, device=device),
@@ -135,10 +86,8 @@ value_module = ValueOperator(
     in_keys=["observation"],
 )
 
-
 print("Running policy:", policy_module(env.reset()))
 print("Running value:", value_module(env.reset()))
-
 
 collector = SyncDataCollector(
     env,
@@ -173,7 +122,6 @@ optim = torch.optim.Adam(loss_module.parameters(), lr)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
     optim, total_frames // frames_per_batch, 0.0
 )
-
 logs = defaultdict(list)
 pbar = tqdm(total=total_frames)
 eval_str = ""
@@ -216,8 +164,8 @@ for i, tensordict_data in enumerate(collector):
     logs["lr"].append(optim.param_groups[0]["lr"])
     lr_str = f"lr policy: {logs['lr'][-1]: 4.4f}"
     if i % 10 == 0:
-    # We evaluate the policy once every 10 batches of data.
-    # Instead of using ExplorationType.MEAN, we sample actions and average them:
+# We evaluate the policy once every 10 batches of data.
+# Instead of using ExplorationType.MEAN, we sample actions and average them:
         with torch.no_grad():
             # execute a rollout with the trained policy, sampling actions
             eval_rollout = env.rollout(1000, policy_module) # Use MODE to sample
@@ -253,4 +201,3 @@ plt.subplot(2, 2, 4)
 plt.plot(logs["eval step_count"])
 plt.title("Max step count (test)")
 plt.show()
-
