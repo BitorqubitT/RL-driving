@@ -12,10 +12,13 @@ Example usage:
     data = spawn_holder.get_data('map1')
 
 """
-
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 import csv
+import itertools
+from dataclasses import dataclass, field
+from typing import List
+
 
 @dataclass
 class SpawnHolder:
@@ -58,5 +61,49 @@ class SpawnHolder:
             A list of tuples, where each tuple contains two integers and a float,
             representing the spawn coordinates and angle.
         """
-
         return self.data.get(key, [])
+
+@dataclass
+class Args:
+    batch_size: List[int] = field(default_factory=list)
+    gamma: List[float] = field(default_factory=list)
+    tau: List[float] = field(default_factory=list)
+    lr: List[float] = field(default_factory=list)
+    episodes: List[int] = field(default_factory=list)
+    eps_start: List[float] = field(default_factory=list)
+    eps_end: List[float] = field(default_factory=list)
+    eps_decay: List[int] = field(default_factory=list)
+    n_actions: List[int] = field(default_factory=list)
+    n_observations: List[int] = field(default_factory=list)
+    game_map: str = ""
+    architecture: str = ""
+    loss_function: str = ""
+    location: str = ""
+    start_pos: str = ""
+    minibatch_size: List[int] = field(default_factory=list)
+    num_iterations: List[int] = field(default_factory=list)
+    seed: int = 0
+    num_steps: List[int] = field(default_factory=list)
+    num_envs: int = 0
+    update_epochs: List[int] = field(default_factory=list)
+    clip_coef: List[float] = field(default_factory=list)
+    clip_vloss: bool = False
+    learning_rate: int = 0
+    anneal_lr: bool = False
+    gae_lambda: float = 0.0
+    norm_adv: bool = False
+    ent_coef: float = 0.0
+    vf_coef: float = 0.0
+    max_grad_norm: float = 0.0
+    target_kl: float = 0.0
+    
+    def check_and_iterate_combinations(self):
+        # Collect all list attributes
+        list_attributes = {field_name: value for field_name, value in self.__dict__.items() if isinstance(value, list) and value}
+        
+        # Generate all possible combinations
+        combinations = list(itertools.product(*list_attributes.values()))
+        
+        return combinations
+
+    #TODO: Is it useful to make seperate function for non iterable args?
