@@ -9,6 +9,7 @@ from torch.distributions.categorical import Categorical
 import wandb
 from dataclass_helper import Args
 from ppo_module import PPOagent
+from ppo_module import Memory
 #TODO: check all args with og paper
 
 # Define your parameters
@@ -85,16 +86,11 @@ if __name__ == "__main__":
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
-    print(num_steps, args.num_envs)
-    obs = torch.zeros((num_steps, args.num_envs) + (9,)).to(device)
-    actions = torch.zeros((num_steps, args.num_envs) + ()).to(device)
-    logprobs = torch.zeros((num_steps, args.num_envs)).to(device)
-    rewards = torch.zeros((num_steps, args.num_envs)).to(device)
-    dones = torch.zeros((num_steps, args.num_envs)).to(device)
-    values = torch.zeros((num_steps, args.num_envs)).to(device)
+    memory = Memory(num_steps, args.num_envs, device)
+    obs, actions, logprobs, rewards, dones, values = memory.get_values()
+
     # TRY NOT TO MODIFY: start the game
     global_step = 0
-    #next_done = torch.zeros(1).to(device)
     for iteration in range(1, args.num_iterations + 1):
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:
@@ -104,28 +100,24 @@ if __name__ == "__main__":
         all_rewards = 0
 
         next_obs = envs.reset()
-        next_obs = torch.tensor(next_obs, dtype=torch.float32, device=device).unsqueeze(0)
-        next_obs = next_obs[0]
+        # ENV returns a list of observations
+        next_obs = torch.tensor(next_obs, dtype=torch.float32, device=device).unsqueeze(0)[0]
         next_done = torch.zeros(1).to(device)
         
         for step in range(0, num_steps):
             global_step += 1
-            obs[step] = next_obs
-            dones[step] = next_done
             
-            # ALGO LOGIC: action logic
             with torch.no_grad():
                 action, logprob, _, value = agent.get_action_and_value(next_obs)
-                values[step] = value.flatten()
-            actions[step] = action
-            logprobs[step] = logprob
+                #TODO: Check on how to resolve this
+                #values[step] = value.flatten()
 
             #TODO: Do i need to change to list? Dont think so
-            action = action.tolist()
-            next_obs, reward, terminations, truncations = envs.step(action)[0]
+            next_obs_1, reward, terminations, truncations = envs.step(action)[0]
             next_done = np.logical_or([terminations], [truncations])
-            rewards[step] = torch.tensor(reward).to(device).view(-1)
-            next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
+            memory.update_values(step, next_obs, action, logprob, reward, torch.Tensor(next_done), value.flatten())
+            
+            next_obs, next_done = torch.Tensor(next_obs_1).to(device), torch.Tensor(next_done).to(device)
             all_rewards += reward
             done = terminations or truncations
 
@@ -135,6 +127,7 @@ if __name__ == "__main__":
 
         # bootstrap value if not done
         with torch.no_grad():
+            print('-----------------------------------------------------------------')
             next_value = agent.get_value(next_obs).reshape(1, -1)
             advantages = torch.zeros_like(rewards).to(device)
             lastgaelam = 0
@@ -158,6 +151,7 @@ if __name__ == "__main__":
         b_values = values.reshape(-1)
 
         # Optimizing the policy and value network
+        #TODO: PUT THIS CODE IN THE NETWORK
         b_inds = np.arange(batch_size)
         clipfracs = []
         for epoch in range(update_epochs):
@@ -214,5 +208,3 @@ if __name__ == "__main__":
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
-
-        # TRY NOT TO MODIFY: record rewards for plotting purposes
