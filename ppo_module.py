@@ -40,29 +40,24 @@ class PPOagent(nn.Module):
         if action is None:
             action = probs.sample()
         return action, probs.log_prob(action), probs.entropy(), self.critic(x)
+
+class Memory():
+    #TODO: Do we create a memory object in PPOAGENT?
+    def __init__(self, num_steps, num_envs, device):
+        self.obs = torch.zeros((num_steps, num_envs) + (9,)).to(device)
+        self.actions = torch.zeros((num_steps, num_envs) + ()).to(device)
+        self.logprobs = torch.zeros((num_steps, num_envs)).to(device)
+        self.rewards = torch.zeros((num_steps, num_envs)).to(device)
+        self.dones = torch.zeros((num_steps, num_envs)).to(device)
+        self.values = torch.zeros((num_steps, num_envs)).to(device)
+
+    def update_values(self, step, obs, actions, logprobs, rewards, dones, values):
+        self.obs[step] = obs
+        self.actions[step] = actions
+        self.logprobs[step] = logprobs
+        self.rewards[step] = rewards
+        self.dones[step] = dones
+        self.values[step] = values
     
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-class PPO(nn.Module):
-
-    def __init__(self, n_observations, n_actions, std):
-        super(PPO, self).__init__()
-        self.netwerk = nn.Sequential(
-            layer_init(nn.Linear(n_observations, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, n_actions), std=std),
-        )
+    def get_values(self):
+        return self.obs, self.actions, self.logprobs, self.rewards, self.dones, self.values
