@@ -75,9 +75,9 @@ if __name__ == "__main__":
             state = state[0]
             counter = 0
             max_reward = 0
-
+            
+            #TODO: change current game to number of steps?
             while current_game:
-                #TODO: add max number of steps
                 counter += 1
                 action = dqn_agent.select_action(state, env, training=True)
                 observation, reward, terminated, truncated = env.step([action.item()])[0]
