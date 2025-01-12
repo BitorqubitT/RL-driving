@@ -26,14 +26,13 @@ class ReplayMemory(object):
 
 class DQNagent():
 
-    #TODO: add comments
-
     def __init__(self, device, batch_size, n_observations, n_actions, gamma, eps_end, eps_start, decay, lr, tau):
         self.policy_net = DQN(n_observations, n_actions).to(device)
         self.target_net = DQN(n_observations, n_actions).to(device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.device = device
         self.batch_size = batch_size
+        #TODO: SHould i not update botH?
         self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=lr, amsgrad=True)
         self.gamma = gamma
         self.memory = ReplayMemory(10000)
@@ -58,11 +57,9 @@ class DQNagent():
             # found, so we pick action with the larger expected reward.
                 return self.policy_net(state).max(1).indices.view(1, 1)
         else:
-           # print("apiowdjwpoijd")
             return torch.tensor([[env.sample()]], device=self.device, dtype=torch.long)
 
     def update_param(self):
-        # State dictionary is mapping from weights to layers
         target_net_state_dict = self.target_net.state_dict()
         policy_net_state_dict = self.policy_net.state_dict()
         for key in policy_net_state_dict:
@@ -106,7 +103,7 @@ class DQNagent():
 
     def save(self, name):
         #TODO maybe give string for name
-        torch.save(self.policy_net.state_dict(), "saved_models/someusefulname_" + str(name) + ".pth")
+        torch.save(self.policy_net.state_dict(), "saved_models/someusefulname_64_randomspawn_" + str(name) + ".pth")
 
     def load(self, file_name):
         #TODO: need a file with param to match the pth
@@ -117,12 +114,13 @@ class DQN(nn.Module):
 
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_observations, 32)
-        #self.layer2 = nn.Linear(32, 32)
-        self.layer3 = nn.Linear(32, n_actions)
+        self.layer1 = nn.Linear(n_observations, 64)
+        self.layer2 = nn.Linear(64, 64)
+        self.layer3 = nn.Linear(64, n_actions)
 
-    def forward(self, x):
+   def forward(self, x):
         x = F.relu(self.layer1(x))
-        #x = F.relu(self.layer2(x))
+        x = F.relu(self.layer2(x))
         return self.layer3(x)
 
+ 
