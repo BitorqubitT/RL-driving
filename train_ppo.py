@@ -14,7 +14,7 @@ from ppo_module import Memory
 
 # Define your parameters
 args = Args(
-    batch_size=[256],
+    batch_size=[5000],
     gamma=[0.99],
     tau=[0.005],
     lr=[1e-3],
@@ -29,10 +29,10 @@ args = Args(
     loss_function="",
     location="random",
     start_pos="static",
-    minibatch_size= 500,
+    minibatch_size= 1250,
     num_iterations= 4000,
     seed= 1,
-    num_steps= [4000],
+    num_steps= [5000],
     num_envs= 1,
     update_epochs= [4],
     clip_coef= [0.2],
@@ -81,31 +81,23 @@ if __name__ == "__main__":
     #TODO: Actually i can run multipe envs i think, that is why i have number of players
     NUMBER_OF_PLAYERS = 1
     envs = Environment("ai", args.game_map, args.start_pos, NUMBER_OF_PLAYERS)
-    #TODO: Put actions and  observations from args.
-    agent = PPOagent(device, 9, 4).to(device)
-    optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
-
-    # ALGO Logic: Storage setup
     memory = Memory(num_steps, args.num_envs, device)
-    obs, actions, logprobs, rewards, dones, values = memory.get_values()
-
-    # TRY NOT TO MODIFY: start the game
+    agent = PPOagent(memory, device, 9, 4, gamma, args.gae_lambda, batch_size, args.minibatch_size, update_epochs, clip_coef, args.learning_rate).to(device)
     global_step = 0
+
     for iteration in range(1, args.num_iterations + 1):
-        # Annealing the rate if instructed to do so.
+        #TODO: CHANGE THIS, seperate method for it
         if args.anneal_lr:
             frac = 1.0 - (iteration - 1.0) / args.num_iterations
             lrnow = frac * args.learning_rate
-            optimizer.param_groups[0]["lr"] = lrnow
+            agent.optimizer.param_groups[0]["lr"] = lrnow
         all_rewards = 0
 
         next_obs = envs.reset()
-        # ENV returns a list of observations
         next_obs = torch.tensor(next_obs, dtype=torch.float32, device=device).unsqueeze(0)[0]
         next_done = torch.zeros(1).to(device)
         
         for step in range(0, num_steps):
-            global_step += 1
             
             with torch.no_grad():
                 action, logprob, _, value = agent.get_action_and_value(next_obs)
@@ -122,89 +114,8 @@ if __name__ == "__main__":
             done = terminations or truncations
 
             if done:
-                print(f"global_step={global_step}", step, all_rewards)
+                print(f"global_step={iteration}", "Steps taken", step, all_rewards)
                 break
-
-        # bootstrap value if not done
-        with torch.no_grad():
-            print('-----------------------------------------------------------------')
-            next_value = agent.get_value(next_obs).reshape(1, -1)
-            advantages = torch.zeros_like(rewards).to(device)
-            lastgaelam = 0
-            for t in reversed(range(num_steps)):
-                if t == num_steps - 1:
-                    nextnonterminal = 1.0 - next_done
-                    nextvalues = next_value
-                else:
-                    nextnonterminal = 1.0 - dones[t + 1]
-                    nextvalues = values[t + 1]
-                delta = rewards[t] + gamma * nextvalues * nextnonterminal - values[t]
-                advantages[t] = lastgaelam = delta + gamma * args.gae_lambda * nextnonterminal * lastgaelam
-            returns = advantages + values
-
-        # flatten the batch
-        b_obs = obs.reshape((-1,) + (9,))
-        b_logprobs = logprobs.reshape(-1)
-        b_actions = actions.reshape((-1,) + ())
-        b_advantages = advantages.reshape(-1)
-        b_returns = returns.reshape(-1)
-        b_values = values.reshape(-1)
-
-        # Optimizing the policy and value network
-        #TODO: PUT THIS CODE IN THE NETWORK
-        b_inds = np.arange(batch_size)
-        clipfracs = []
-        for epoch in range(update_epochs):
-            np.random.shuffle(b_inds)
-            for start in range(0, batch_size, args.minibatch_size):
-                end = start + args.minibatch_size
-                mb_inds = b_inds[start:end]
-
-                _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], b_actions.long()[mb_inds])
-                logratio = newlogprob - b_logprobs[mb_inds]
-                ratio = logratio.exp()
-
-                with torch.no_grad():
-                    # calculate approx_kl http://joschu.net/blog/kl-approx.html
-                    old_approx_kl = (-logratio).mean()
-                    approx_kl = ((ratio - 1) - logratio).mean()
-                    clipfracs += [((ratio - 1.0).abs() > clip_coef).float().mean().item()]
-
-                mb_advantages = b_advantages[mb_inds]
-                if args.norm_adv:
-                    mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
-
-                # Policy loss
-                pg_loss1 = -mb_advantages * ratio
-                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - clip_coef, 1 + clip_coef)
-                pg_loss = torch.max(pg_loss1, pg_loss2).mean()
-
-                # Value loss
-                newvalue = newvalue.view(-1)
-                if args.clip_vloss:
-                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
-                    v_clipped = b_values[mb_inds] + torch.clamp(
-                        newvalue - b_values[mb_inds],
-                        -clip_coef,
-                        clip_coef,
-                    )
-                    v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
-                    v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
-                    v_loss = 0.5 * v_loss_max.mean()
-                else:
-                    v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
-
-                entropy_loss = entropy.mean()
-                loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
-
-                optimizer.zero_grad()
-                loss.backward()
-                nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm)
-                optimizer.step()
-
-            if args.target_kl is not None and approx_kl > args.target_kl:
-                break
-
-        y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
-        var_y = np.var(y_true)
-        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+        
+        agent.optimise_networks(next_obs, next_done, num_steps, args.ent_coef, args.vf_coef, args.norm_adv, args.clip_vloss, args.max_grad_norm, args.target_kl)
+        # TODO: return something from this
