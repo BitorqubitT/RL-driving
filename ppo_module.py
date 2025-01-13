@@ -3,19 +3,16 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
-
-def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
-    torch.nn.init.orthogonal_(layer.weight, std)
-    torch.nn.init.constant_(layer.bias, bias_const)
-    return layer
+from torch.utils.data import DataLoader, TensorDataset
 
 class PPOagent(nn.Module):
     def __init__(self, memory, device, n_observations, n_actions, gamma, gae_lambda, batch_size, mini_batchsize, update_epoch, clip_coef, learning_rate):
         super().__init__()
         #TODO: Maybe remove device?
-        #self.critic = PPO(n_observations, 1, 1.0).to(device)
-        #self.actor = PPO(n_observations, n_actions, 0.01).to(device)
+        self.critic = PPO(n_observations, 1, 1.0).to(device)
+        self.actor = PPO(n_observations, n_actions, 0.01).to(device)
         self.memory = memory
         self.device = device
         self.gamma = gamma
@@ -24,21 +21,6 @@ class PPOagent(nn.Module):
         self.minibatch_size = mini_batchsize
         self.update_epochs = update_epoch
         self.clip_coef = clip_coef
-        #TODO: CLEAN THIS UP
-        self.critic = nn.Sequential(
-            layer_init(nn.Linear(n_observations, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 1), std=1.0),
-        )
-        self.actor = nn.Sequential(
-            layer_init(nn.Linear(n_observations, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, n_actions), std=0.01),
-        )
         self.optimizer = optim.Adam(list(self.actor.parameters()) + list(self.critic.parameters()), lr=learning_rate, eps=1e-5)
 
     def get_value(self, x):
@@ -58,8 +40,6 @@ class PPOagent(nn.Module):
         self.optimizer.step()
 
     def optimise_networks(self, next_obs, next_done, num_steps, ent_coef, vf_coef, norm_adv, clip_vloss, max_grad_norm, target_kl):
-
-        # bootstrap value if not done
         with torch.no_grad():
             next_value = self.get_value(next_obs).reshape(1, -1)
             advantages = torch.zeros_like(self.memory.rewards).to(self.device)
@@ -75,36 +55,32 @@ class PPOagent(nn.Module):
                 advantages[t] = lastgaelam = delta + self.gamma * self.gae_lambda * nextnonterminal * lastgaelam
             returns = advantages + self.memory.values
 
-        # flatten the batch
-        b_obs = self.memory.obs.reshape((-1,) + (9,))
+        # Flatten the batch
+        b_obs = self.memory.obs.reshape((-1,) + self.memory.obs.shape[2:])
         b_logprobs = self.memory.logprobs.reshape(-1)
-        b_actions = self.memory.actions.reshape((-1,) + ())
+        b_actions = self.memory.actions.reshape(-1)
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = self.memory.values.reshape(-1)
 
-        # Optimizing the policy and value network
-        #TODO: PUT THIS CODE IN THE NETWORK
-        b_inds = np.arange(self.batch_size)
-        clipfracs = []
-        for epoch in range(self.update_epochs):
-            np.random.shuffle(b_inds)
-            for start in range(0, self.batch_size, self.minibatch_size):
-                end = start + self.minibatch_size
-                mb_inds = b_inds[start:end]
+        # Create DataLoader for batch processing
+        dataset = TensorDataset(b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values)
+        dataloader = DataLoader(dataset, batch_size=self.minibatch_size, shuffle=False)
 
-                _, newlogprob, entropy, newvalue = self.get_action_and_value(b_obs[mb_inds], b_actions.long()[mb_inds])
-                logratio = newlogprob - b_logprobs[mb_inds]
+        clipfracs = []
+        for _ in range(self.update_epochs):
+            for batch in dataloader:
+                mb_obs, mb_logprobs, mb_actions, mb_advantages, mb_returns, mb_values = batch
+
+                _, newlogprob, entropy, newvalue = self.get_action_and_value(mb_obs, mb_actions.long())
+                logratio = newlogprob - mb_logprobs
                 ratio = logratio.exp()
 
                 with torch.no_grad():
-                    # calculate approx_kl http://joschu.net/blog/kl-approx.html
-                    # Can save old kl if we want
                     old_approx_kl = (-logratio).mean()
                     approx_kl = ((ratio - 1) - logratio).mean()
                     clipfracs += [((ratio - 1.0).abs() > self.clip_coef).float().mean().item()]
 
-                mb_advantages = b_advantages[mb_inds]
                 if norm_adv:
                     mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
@@ -116,29 +92,27 @@ class PPOagent(nn.Module):
                 # Value loss
                 newvalue = newvalue.view(-1)
                 if clip_vloss:
-                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
-                    v_clipped = b_values[mb_inds] + torch.clamp(
-                        newvalue - b_values[mb_inds],
-                        -self.clip_coef,
-                        self.clip_coef,
-                    )
-                    v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
+                    v_loss_unclipped = (newvalue - mb_returns) ** 2
+                    v_clipped = mb_values + torch.clamp(newvalue - mb_values, -self.clip_coef, self.clip_coef)
+                    v_loss_clipped = (v_clipped - mb_returns) ** 2
                     v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
                     v_loss = 0.5 * v_loss_max.mean()
                 else:
-                    v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
+                    v_loss = 0.5 * ((newvalue - mb_returns) ** 2).mean()
 
                 entropy_loss = entropy.mean()
                 loss = pg_loss - ent_coef * entropy_loss + v_loss * vf_coef
 
                 self.optimize(loss, max_grad_norm)
 
-            if target_kl is not None and approx_kl > target_kl:
-                break
+                if target_kl is not None and approx_kl > target_kl:
+                    break
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
-        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y\
+        #TODO: return some useful stats
+        return explained_var
 
     def save(self, name):
         #TODO maybe give string for name
@@ -172,3 +146,20 @@ class Memory():
     
     def get_values(self):
         return self.obs, self.actions, self.logprobs, self.rewards, self.dones, self.values
+    
+def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+    torch.nn.init.orthogonal_(layer.weight, std)
+    torch.nn.init.constant_(layer.bias, bias_const)
+    return layer
+
+class PPO(nn.Module):
+    def __init__(self, n_observations, n_actions, std):
+        super(PPO, self).__init__()
+        self.layer1 = layer_init(nn.Linear(n_observations, 64))
+        self.layer2 = layer_init(nn.Linear(64, 64))
+        self.layer3 = layer_init(nn.Linear(64, n_actions), std=std)
+
+    def forward(self, x):
+        x = F.tanh(self.layer1(x))
+        x = F.tanh(self.layer2(x))
+        return self.layer3(x)
