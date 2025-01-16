@@ -1,13 +1,11 @@
-from game_env import Environment
-import torch
-from dqn_module import DQNagent
-from game_env import Environment
-
 """
     Let AI play the game.
     Load pytorch model and correct params.
     Run the game.
 """
+from game_env import Environment
+import torch
+from dqn_module import DQNagent
 
 if __name__ == "__main__":
 
@@ -27,8 +25,8 @@ if __name__ == "__main__":
     dqn_agent = DQNagent(device, BATCH_SIZE, N_OBSERVATIONS, N_ACTIONS, GAMMA, EPS_END, EPS_START, EPS_DECAY, LR, TAU)
     dqn_agent2 = DQNagent(device, BATCH_SIZE, N_OBSERVATIONS, N_ACTIONS, GAMMA, EPS_END, EPS_START, EPS_DECAY, LR, TAU)
     
-    file_name = "saved_models/someusefulname_64_randomspawn_track151_54.12.pth"
-    file_name2 = "saved_models/someusefulname_64_randomspawn_track151_54.12.pth"
+    file_name = "saved_models/track 1 128/someusefulname_64_randomspawn_track1239_52.07.pth"
+    file_name2 = "saved_models/track 1 128/someusefulname_64_randomspawn_track1239_52.07.pth"
     dqn_agent.load(file_name)
     dqn_agent2.load(file_name2)
     all_agents = [dqn_agent, dqn_agent2]
@@ -36,7 +34,7 @@ if __name__ == "__main__":
     MAP = "track 1"
     START_POS = "static"
     NUMBER_OF_PLAYERS = 2
-    env = Environment("player", "track 1", START_POS, NUMBER_OF_PLAYERS)
+    env = Environment("player", MAP, START_POS, NUMBER_OF_PLAYERS)
     state = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
     apwojd = 0
