@@ -2,11 +2,11 @@ import pygame
 import pygame.freetype
 import random
 import ast
+import os
 import numpy as np
-from level import Level
 from car import Car
 from dataclass_helper import SpawnHolder
-import os
+from pygame.sprite import Sprite
 
 class Environment():
     """Load and update the game, take in actions, and keep score.
@@ -76,14 +76,14 @@ class Environment():
             spawnpoints.load_data_from_file(self.map)
         return spawnpoints
 
-    def reset(self) -> None:
+    def reset(self) -> list:
         """Reset the environment to its initial state.
 
         Returns:
             list: The state of the car.
         """
         self.cars = []
-        for i in range(0, self.number_of_players):
+        for _ in range(0, self.number_of_players):
             if self.start_pos == "random":
                 pos = random.choice(self.start_locations.get_data(self.map))
             else:
@@ -105,7 +105,7 @@ class Environment():
         """
         return random.choice(self.action_space)
 
-    def step(self, all_keys: list) -> None:
+    def step(self, all_keys: list) -> list:
         """Take a step in the environment.
 
         Args:
@@ -115,7 +115,7 @@ class Environment():
             list: The state, reward, hit wall check, and finished status for each car.
         """
         if self.mode != "ai":
-            self.render()
+            self._render()
 
         return_per_car = []
         for i, carr in enumerate(self.cars):
@@ -145,7 +145,7 @@ class Environment():
 
         return return_per_car
 
-    def render(self) -> None:
+    def _render(self) -> None:
         """Render the game environment."""
         self.window.blit(self.background, (0, 0))
         self.track_group.draw(self.window)
@@ -185,3 +185,11 @@ class Environment():
         """
         track = "track_info\\" + self.map + ".csv"
         return np.genfromtxt(track, delimiter=',', dtype = bool).reshape(1920, 1080)
+
+class Level(Sprite):
+    def __init__(self, image: str, x: int, y: int):
+        Sprite.__init__(self)
+        self.image = pygame.image.load(image).convert_alpha()
+        self.mask = pygame.mask.from_surface(self.image)
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y) 
