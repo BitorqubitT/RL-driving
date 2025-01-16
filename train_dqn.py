@@ -1,6 +1,7 @@
-import itertools
-from typing import List, Generator
-from dataclasses import dataclass
+"""
+This script contains the maintraining loop for training the DQN agent.
+"""
+
 from dqn_module import DQNagent
 from game_env import Environment
 from utils.helper import calc_mean
@@ -19,7 +20,6 @@ if __name__ == "__main__":
     device = "cuda"
     number_of_exp = 0
 
-    # Define your parameters
     args = Args(
         batch_size=[256],
         gamma=[0.99],
@@ -37,6 +37,7 @@ if __name__ == "__main__":
         location="random",
         start_pos="random"
     )
+    
     for combination in args.check_and_iterate_combinations():
         batch_size, gamma, tau, lr, episodes, eps_start, eps_end, eps_decay, n_actions, n_observations = combination
 
