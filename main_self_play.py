@@ -10,8 +10,8 @@ if __name__ == "__main__":
 
     MODE = "player"
     MAP_NAMES = ["scuffed monza", "track 1"]
-    MAP = "track 1"
-    START_POS = "random"
+    MAP = "track 3"
+    START_POS = "static"
     NUMBER_OF_PLAYERS = 1
 
     env = Environment(MODE, MAP, START_POS, NUMBER_OF_PLAYERS)
@@ -30,4 +30,3 @@ if __name__ == "__main__":
         observation, reward, terminated, truncated = env.step(keys)[0]
         total_reward += reward
         
-        print(total_reward)

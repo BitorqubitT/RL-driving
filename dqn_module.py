@@ -98,12 +98,11 @@ class DQNagent():
         self.optimizer.zero_grad()
         loss.backward()
         # In-place gradient clipping
-        torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
+        torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 10)
         self.optimizer.step()
 
-    def save(self, name):
-        #TODO maybe give string for name
-        torch.save(self.policy_net.state_dict(), "saved_models/someusefulname_64_randomspawn_" + str(name) + ".pth")
+    def save(self, name, game_map, start_pos):
+        torch.save(self.policy_net.state_dict(), "saved_models/dqn_" + game_map + "_" + start_pos + "_" + str(name) + ".pth")
 
     def load(self, file_name):
         #TODO: need a file with param to match the pth

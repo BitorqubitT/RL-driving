@@ -1,7 +1,6 @@
 """
 This script contains the maintraining loop for training the DQN agent.
 """
-
 from dqn_module import DQNagent
 from game_env import Environment
 from utils.helper import calc_mean
@@ -17,7 +16,7 @@ if __name__ == "__main__":
         "cpu"
     )
 
-    device = "cuda"
+    device = "cpu"
     number_of_exp = 0
 
     args = Args(
@@ -31,19 +30,19 @@ if __name__ == "__main__":
         eps_decay=[1000],
         n_actions=[4],
         n_observations=[9],
-        game_map="track 1",
+        game_map= ["track 3"],
         architecture="2 layer 64",
         loss_function="",
-        location="random",
-        start_pos="random"
+        start_pos= ["random"]
     )
-    
+
     for combination in args.check_and_iterate_combinations():
-        batch_size, gamma, tau, lr, episodes, eps_start, eps_end, eps_decay, n_actions, n_observations = combination
+        print(combination)
+        batch_size, gamma, tau, lr, episodes, eps_start, eps_end, eps_decay, n_actions, n_observations, game_map, start_pos = combination
 
         wandb.init(
-            project = "rl_64_2layer_input4_randomspos_track1",
-            name = f"experiment_{number_of_exp}",
+            project = "rl_dqn_2*64_run_2",
+            name = f"experiment_{game_map}_{start_pos}",
             config={"batch_size": batch_size,
                     "gamma": gamma,
                     "eps_decay": eps_decay,
@@ -56,19 +55,17 @@ if __name__ == "__main__":
                     "n_observations": n_observations,
                     "network_architecture": args.architecture,
                     "loss_function": args.loss_function,
-                    "map": args.game_map,
-                    "location": args.location
-                    # TODO: add info about the network
-                    # Loss function maybe, add that ass param to dqn?
+                    "map": game_map,
                     }
         )
 
         number_of_exp += 1
         current_game = True
         all_rewards = []
+        NUMBER_OF_PLAYERS = 1
 
         dqn_agent = DQNagent(device, batch_size, n_observations, n_actions, gamma, eps_end, eps_start, eps_decay, lr, tau)
-        env = Environment("ai", args.game_map, args.start_pos, 1)
+        env = Environment("ai", game_map, start_pos, NUMBER_OF_PLAYERS)
 
         for i in range(0, episodes):
             state = env.reset()
@@ -85,7 +82,7 @@ if __name__ == "__main__":
                 observation = observation[0]
                 max_reward += reward
 
-                if max_reward == 0 and counter == 100 or counter == 5000:
+                if max_reward == 0 and counter == 300 or counter == 10000:
                     truncated = True
                 
                 reward = torch.tensor([reward], device=device)
@@ -108,7 +105,7 @@ if __name__ == "__main__":
                     wandb.log({"reward": max_reward, "epi_durations": counter, "mean_score": mean})
                     break
             
-            if max_reward >= 180 or mean >= 40:
-                save_name = "track1" + str(max_reward) + "_" + str(mean)
-                dqn_agent.save(save_name)
+            if max_reward >= 180 or mean >= 80:
+                save_name = str(max_reward) + "_" + str(mean)
+                dqn_agent.save(save_name, game_map, start_pos)
         wandb.finish()

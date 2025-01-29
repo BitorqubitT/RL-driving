@@ -85,10 +85,19 @@ class Environment():
         self.cars = []
         for _ in range(0, self.number_of_players):
             if self.start_pos == "random":
-                pos = random.choice(self.start_locations.get_data(self.map))
+                pos = random.choice(self.start_locations.get_spawn_data(self.map))
             else:
-                pos = self.start_locations.get_data(self.map)[0]
-            car = Car("assets/car12.png", pos[0], pos[1], pos[2], self.mode)
+                pos = self.start_locations.get_spawn_data(self.map)[0]
+            #TODO: TRASH -> Clean this
+            diff_car = "car12.png"
+            diff_car2 = "car13.png"
+            car_name = "assets/"
+            if _ == 0:
+                car_name += diff_car
+            elif _ == 1:
+                car_name += diff_car2
+            car = Car(car_name, pos[0], pos[1], pos[2], self.mode)
+            #car = Car("assets/car12.png", pos[0], pos[1], pos[2], self.mode)
             self.cars.append(car)
             if self.mode == "player":
                 self.car_group.add(car)
@@ -124,7 +133,6 @@ class Environment():
             carr.update(self.walls)
             hit_wall_check = carr.hitwall
             finished = False
-
             if hit_wall_check:
                 reward -= 1
 

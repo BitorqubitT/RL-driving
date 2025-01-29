@@ -108,15 +108,15 @@ class PPOagent(nn.Module):
                 if target_kl is not None and approx_kl > target_kl:
                     break
 
-        y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
-        var_y = np.var(y_true)
-        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y\
+        #y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
+        #var_y = np.var(y_true)
+        #explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y\
         #TODO: return some useful stats
-        return explained_var
+        return None
 
-    def save(self, name):
+    def save(self, name, game_map, start_pos):
         #TODO maybe give string for name
-        torch.save(self.actor.state_dict(), "saved_models/ppo_64_static_" + str(name) + ".pth")
+        torch.save(self.actor.state_dict(), "saved_models/ppo_" + game_map + "_" + start_pos + "_" + str(name) + ".pth")
 
     def load(self, file_name):
         #TODO: need a file with param to match the pth

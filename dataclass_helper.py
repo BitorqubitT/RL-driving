@@ -22,7 +22,6 @@ class SpawnHolder:
         spawn_holder.load_data_from_file('map1')
         data = spawn_holder.get_spawn_data('map1')
 
-
     Attributes:
         data: A dictionary where the key is a string representing the map name,
               and the value is a list of tuples. Each tuple contains three elements:
@@ -71,11 +70,10 @@ class Args:
     eps_decay: List[int] = field(default_factory=list)
     n_actions: List[int] = field(default_factory=list)
     n_observations: List[int] = field(default_factory=list)
-    game_map: str = ""
+    game_map: List[str] = field(default_factory=list)
     architecture: str = ""
     loss_function: str = ""
-    location: str = ""
-    start_pos: str = ""
+    start_pos: List[str] = field(default_factory=list)
     minibatch_size: List[int] = field(default_factory=list)
     num_iterations: List[int] = field(default_factory=list)
     seed: int = 0
@@ -84,7 +82,6 @@ class Args:
     update_epochs: List[int] = field(default_factory=list)
     clip_coef: List[float] = field(default_factory=list)
     clip_vloss: bool = False
-    learning_rate: int = 0
     anneal_lr: bool = False
     gae_lambda: float = 0.0
     norm_adv: bool = False
@@ -94,12 +91,7 @@ class Args:
     target_kl: float = 0.0
     
     def check_and_iterate_combinations(self):
-        # Collect all list attributes
         list_attributes = {field_name: value for field_name, value in self.__dict__.items() if isinstance(value, list) and value}
-        
-        # Generate all possible combinations
         combinations = list(itertools.product(*list_attributes.values()))
         
         return combinations
-
-    #TODO: Is it useful to make seperate function for non iterable args?
