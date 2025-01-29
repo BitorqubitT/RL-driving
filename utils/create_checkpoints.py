@@ -1,9 +1,8 @@
 import pygame
 from pygame.sprite import Sprite
 import numpy as np
-import pandas as pd
-import math
 
+"""
 # Putting in coordinates for checkpoints sucks
 # In this function do the following:
 # Load map
@@ -11,8 +10,8 @@ import math
 # Draw lines between these points
 # Save the points in this line
 # Write to text file
+"""
 
-# Window size
 WINDOW_WIDTH    = 1920
 WINDOW_HEIGHT   = 1080
 WINDOW_SURFACE  = pygame.HWSURFACE|pygame.DOUBLEBUF|pygame.RESIZABLE
@@ -45,7 +44,6 @@ def integer_points_on_line(p1, p2):
         x += x_increment
         y += y_increment
 
-    # Remove duplicates
     points = list(set(points))
     points.sort()
 
@@ -81,14 +79,13 @@ class Environment():
         #pygame.draw.line(self.window, (255, 0, 0), (0, 300), (1800, 300))
         self.track_group.draw(self.window)
         for checkp in self.checkpoints:
-            #print(checkp)
             pygame.draw.line(self.window, (255, 0 ,0), checkp[0], checkp[1])
         pygame.display.flip()
         return None
 
     # What is returned?
     def _load_obstacles(self) -> None:
-        self.track = Level("assets/track 1.png", WINDOW_WIDTH//2, WINDOW_HEIGHT//2)
+        self.track = Level("assets/track 3.png", WINDOW_WIDTH//2, WINDOW_HEIGHT//2)
         self.track_group = pygame.sprite.Group()
         self.track_group.add(self.track)
         return self.track_group
@@ -113,21 +110,17 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 current_game = False     
             if event.type == pygame.MOUSEBUTTONDOWN:
-                #print("pos", event.pos)
                 checkpoint.append(event.pos)
         
         if len(checkpoint) == 2:
             env.add_checkpoints(checkpoint)
-            #env.checkpoints = env.checkpoints.append([checkpoint])
         
-        #print("mychckp", checkpoint)
-        #keys = pygame.key.get_pressed()
         env.render()
         if len(checkpoint) == 2:
             checkpoint = []
     all_checkp = env.checkpoints
 
-    with open(r"checkpoints_track1.txt", "w") as fp:
+    with open(r"checkpoints\track 3.txt", "w") as fp:
         for point in all_checkp:
             fp.write("%s\n" % [point[0], point[1]])
            

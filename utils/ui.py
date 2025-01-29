@@ -29,8 +29,7 @@ class UIElement(Sprite):
     def draw(self, surface) -> None:
         surface.blit(self.image, self.rect)
 
-
-def play_level(screen, sens1, sens2, sens3, speed, laps) -> None:
+def play_level(screen, sens1, sens2, sens3, speed, laps, checkpoints) -> None:
     """ Function which updates the screen with the UI"""
     lap_time = UIElement(
         center_position=(1840, 60),
@@ -80,6 +79,15 @@ def play_level(screen, sens1, sens2, sens3, speed, laps) -> None:
         text=f"Laps ({laps})",
     )
 
+    checkpoints = UIElement(
+        center_position=(1840, 240),
+        font_size=20,
+        bg_rgb=BLUE,
+        text_rgb=WHITE,
+        text=f"Laps ({checkpoints})",
+    )
+
+    checkpoints.draw(screen)
     lap_time.draw(screen)
     speed.draw(screen)
     lap_counter.draw(screen)

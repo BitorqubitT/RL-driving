@@ -1,58 +1,65 @@
 import pandas as pd
 import time
-import matplotlib.pyplot as plt
 import torch
-from IPython import display
+import math
 
-def store_replay(replays):
-    """
-        Get the replays from all iterations. 
-        Save each replay seperate to a csv file.
+"""
+    Contains helper functions for training.
+"""
 
-    Args:
-        replays (list): List with replays.
-    """
-
-    df = pd.DataFrame(replays, columns = ["x", "y", "heading", "speed", "rewards", "moves"])
-    # Add param in title soon
-    filename = "replays/" + "rpl" + "-" + str(time.strftime("%Y%m%d-%H%M%S")) + ".csv"
-    df.to_csv(filename)
-
-def read_replay(file_name):
-    """
-        Get list of replays, load these.
-
-    Args:
-        file_name (str): Path to file containing replay.
-
-    Returns:
-        Lists: Two lists containing coordinates and moves.
-    """
-    df = pd.read_csv(file_name)
-    return df
-
-def plot_durations(episode_durations):
-    """
-        Shows a plot during training.
-
-    Args:
-        episode_durations (_type_): _description_
-    """
-    plt.figure(1)
-    durations_t = torch.tensor(episode_durations, dtype=torch.float)
-    plt.clf()
-    plt.title('Training...')
-    plt.xlabel('Episode')
-    plt.ylabel('Duration')
-    plt.plot(durations_t.numpy())
+def calc_mean(scores):
+    scores = torch.tensor(scores, dtype=torch.float)
     # Take 100 episode averages and plot them too
-    if len(durations_t) >= 100:
-        means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
+    if len(scores) >= 100:
+        means = scores.unfold(0, 100, 1).mean(1).view(-1)
         means = torch.cat((torch.zeros(99), means))
-        plt.plot(means.numpy())
-    plt.pause(0.001)
-    display.display(plt.gcf())
-    display.clear_output(wait=True)
+        return means.numpy()[-1]
+    return 0
 
+def rotate_point(px, py, angle):
+    cos_angle = math.cos(angle)
+    sin_angle = math.sin(angle)
+    x_new = px * cos_angle - py * sin_angle
+    y_new = px * sin_angle + py * cos_angle
+    return x_new, y_new
 
+def calculate_angle(source, target):
+    velocity = (target[0] - source[0], target[1] - source[1])
+    angle = math.atan2(velocity[1], velocity[0])
+    return angle
 
+def is_point_on_line2(p1, p2, p):
+        #print(p1, p2, p)
+        # Calculate the cross product of vectors (p1 -> p) and (p1 -> p2)
+        dxc = p[0] - p1[0]
+        dyc = p[1] - p1[1]
+        dxl = p2[0] - p1[0]
+        dyl = p2[1] - p1[1]
+        cross = dxc * dyl - dyc * dxl
+
+        # If the cross product is zero, the point is on the line
+        # Shouldnt this be 0?
+        if cross >= 1:
+            return False
+
+        # Check if the point is within the bounds of the line segment
+        if abs(dxl) >= abs(dyl):
+            return p1[0] <= p[0] <= p2[0] if dxl > 0 else p2[0] <= p[0] <= p1[0]
+        else:
+            return p1[1] <= p[1] <= p2[1] if dyl > 0 else p2[1] <= p[1] <= p1[1]
+        
+def is_point_on_line(p1, p2, p, tolerance):
+    #print(p1, p2, p)
+    x1, y1 = p1
+    x2, y2 = p2
+    x, y = p
+    # Calculate the slope of the line formed by (x1, y1) and (x2, y2)
+    if x2 - x1 == 0:  # Vertical line
+        return abs(x - x1) <= tolerance
+    slope = (y2 - y1) / (x2 - x1)
+    
+    # Calculate the y-intercept of the line
+    intercept = y1 - slope * x1
+    
+    # Check if the point (x, y) satisfies the line equation y = slope * x + intercept
+    return abs(y - (slope * x + intercept)) <= tolerance
