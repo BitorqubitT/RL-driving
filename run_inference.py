@@ -91,11 +91,9 @@ if __name__ == "__main__":
         all_actions = []
         
         for i, agent in enumerate(all_agents):
-            print(i)
             if i == 1:
                 action = agent.select_action(all_states[i][0], env, False)
                 all_actions.append(action.item())
-            
             elif i == 0:
                 action, _, _, _ = agent.get_action_and_value(all_states[i][0])
                 all_actions.append(action)

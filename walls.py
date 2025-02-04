@@ -30,7 +30,6 @@ def get_walls(track: pygame.Surface) -> np.array:
 if __name__ == "__main__":
 
     window = pygame.display.set_mode((1920, 1080))
-    pygame.init()
     map_name = "track 3"
     track = Level("assets/" + map_name + ".png", 1920//2, 1080//2)
     track_group = pygame.sprite.Group()

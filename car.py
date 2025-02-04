@@ -227,7 +227,7 @@ class Car(Sprite):
         Returns:
             None
         """
-        if self.player_type == "plaayer":
+        if self.player_type == "palayer":
             if keys[pygame.K_UP]:
                 self._accelerate(1.0)
             if keys[pygame.K_DOWN]:

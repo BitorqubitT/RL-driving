@@ -9,7 +9,6 @@ from game_env import Environment
 if __name__ == "__main__":
 
     MODE = "player"
-    MAP_NAMES = ["scuffed monza", "track 1"]
     MAP = "track 3"
     START_POS = "static"
     NUMBER_OF_PLAYERS = 1

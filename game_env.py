@@ -54,9 +54,9 @@ class Environment():
 
     def _initialize_pygame(self):
         """Initialize pygame components."""
-        pygame.init()
+        #pygame.init()
         pygame.display.set_caption("Car sim :)")
-        self.window = pygame.display.set_mode((1920, 1080), pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.RESIZABLE)
+        self.window = pygame.display.set_mode((1920, 1080))
         self.background = pygame.image.load("assets/background2.png")
         self.car_group = pygame.sprite.Group()
         self.track_group = self._load_obstacles()
@@ -89,8 +89,8 @@ class Environment():
             else:
                 pos = self.start_locations.get_spawn_data(self.map)[0]
             #TODO: TRASH -> Clean this
-            diff_car = "car12.png"
-            diff_car2 = "car13.png"
+            diff_car = "car13.png"
+            diff_car2 = "car12.png"
             car_name = "assets/"
             if _ == 0:
                 car_name += diff_car
@@ -100,10 +100,12 @@ class Environment():
             #car = Car("assets/car12.png", pos[0], pos[1], pos[2], self.mode)
             self.cars.append(car)
             if self.mode == "player":
+                self.car_group = pygame.sprite.Group()
                 self.car_group.add(car)
             car.update(self.walls)
             self.checkpoints = self._set_checkpoints()
             self.checkpoint_counter = 0
+        print(self.cars)
         return car.state
     
     def sample(self):
