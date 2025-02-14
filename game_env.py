@@ -5,10 +5,13 @@ import ast
 import os
 import numpy as np
 from car import Car
-from dataclass_helper import SpawnHolder
+from utils.dataclass_helper import SpawnHolder
 from pygame.sprite import Sprite
+from typing import List, Tuple, Union
 
 class Environment():
+    WINDOW_WIDTH, WINDOW_HEIGHT = 1920, 1080
+
     """Load and update the game, take in actions, and keep score.
 
     Attributes:
@@ -17,7 +20,6 @@ class Environment():
         reward (list): The list of rewards.
         mode (str): The mode of the game ('ai' or 'player').
         map (str): The map of the game.
-        checkpoint_counter (int): The counter for checkpoints.
         last_checkpoint (list): The last checkpoint reached.
         start_locations (SpawnHolder): The start locations for the cars.
         start_pos (str): The starting position of the cars.
@@ -36,17 +38,16 @@ class Environment():
             number_of_players (int): The number of players.
         """
         self.action_space = np.array([0, 1, 2, 3])
-        self.cars = []
-        self.reward = []
-        self.mode = mode
-        self.map = map
-        self.checkpoint_counter = 0
-        self.last_checkpoint = []
+        self.cars: List[Car] = []
+        self.reward: List[float] = []
+        self.mode: str = mode
+        self.map: str = map
+        self.last_checkpoint: List[Tuple[float, float]] = []
         self.start_locations = self._load_start_locations()
-        self.start_pos = start_pos
+        self.start_pos: str = start_pos
         self.walls = self._get_walls()
-        self.checkpoints = self._set_checkpoints()
-        self.number_of_players = number_of_players
+        self.checkpoints: List[Tuple[float, float]] = self._set_checkpoints()
+        self.number_of_players: int = number_of_players
 
         if mode != "ai":
             self._initialize_pygame()
@@ -54,9 +55,8 @@ class Environment():
 
     def _initialize_pygame(self):
         """Initialize pygame components."""
-        #pygame.init()
         pygame.display.set_caption("Car sim :)")
-        self.window = pygame.display.set_mode((1920, 1080))
+        self.window = pygame.display.set_mode((self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
         self.background = pygame.image.load("assets/background2.png")
         self.car_group = pygame.sprite.Group()
         self.track_group = self._load_obstacles()
@@ -76,36 +76,33 @@ class Environment():
             spawnpoints.load_data_from_file(self.map)
         return spawnpoints
 
-    def reset(self) -> list:
+    def reset(self) -> List[str]:
         """Reset the environment to its initial state.
 
         Returns:
             list: The state of the car.
         """
         self.cars = []
-        for _ in range(0, self.number_of_players):
+        for i in range(0, self.number_of_players):
             if self.start_pos == "random":
                 pos = random.choice(self.start_locations.get_spawn_data(self.map))
             else:
                 pos = self.start_locations.get_spawn_data(self.map)[0]
-            #TODO: TRASH -> Clean this
+            #TODO: TRASH -> To display different cars.
             diff_car = "car13.png"
             diff_car2 = "car12.png"
             car_name = "assets/"
-            if _ == 0:
+            if i == 0:
                 car_name += diff_car
-            elif _ == 1:
+            elif i == 1:
                 car_name += diff_car2
             car = Car(car_name, pos[0], pos[1], pos[2], self.mode)
-            #car = Car("assets/car12.png", pos[0], pos[1], pos[2], self.mode)
             self.cars.append(car)
             if self.mode == "player":
                 self.car_group = pygame.sprite.Group()
                 self.car_group.add(car)
             car.update(self.walls)
             self.checkpoints = self._set_checkpoints()
-            self.checkpoint_counter = 0
-        print(self.cars)
         return car.state
     
     def sample(self):
@@ -116,7 +113,7 @@ class Environment():
         """
         return random.choice(self.action_space)
 
-    def step(self, all_keys: list) -> list:
+    def step(self, all_keys: List[int]) -> List[Union[str, float, bool]]:
         """Take a step in the environment.
 
         Args:
@@ -147,8 +144,6 @@ class Environment():
                         reward += 1
                         self.last_checkpoint = self.checkpoints[find_index]
 
-                # Maybe extra reward for whole lap
-
             return_per_car.append([carr.state, reward, hit_wall_check, finished])
             if hit_wall_check:
                 carr.reset()
@@ -163,18 +158,18 @@ class Environment():
         pygame.display.flip()
         return None
 
-    def _load_obstacles(self) -> None:
+    def _load_obstacles(self) -> pygame.sprite.Group:
         """Load the obstacles for the track.
 
         Returns:
             pygame.sprite.Group: The group of track obstacles.
         """
-        self.track = Level("assets/" + self.map + ".png", 1920//2, 1080//2)
+        self.track = Level("assets/" + self.map + ".png", self.WINDOW_WIDTH//2, self.WINDOW_HEIGHT//2)
         self.track_group = pygame.sprite.Group()
         self.track_group.add(self.track)
         return self.track_group
     
-    def _set_checkpoints(self) -> list:
+    def _set_checkpoints(self) -> List[Tuple[float, float]]:
         """Set the checkpoints for the track.
 
         Returns:
@@ -194,7 +189,7 @@ class Environment():
             np.ndarray: The array representing the walls.
         """
         track = "track_info\\" + self.map + ".csv"
-        return np.genfromtxt(track, delimiter=',', dtype = bool).reshape(1920, 1080)
+        return np.genfromtxt(track, delimiter=',', dtype = bool).reshape(self.WINDOW_WIDTH, self.WINDOW_HEIGHT)
 
 class Level(Sprite):
     def __init__(self, image: str, x: int, y: int):

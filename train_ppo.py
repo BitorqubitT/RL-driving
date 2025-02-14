@@ -6,7 +6,7 @@ from game_env import Environment
 import numpy as np
 import torch
 import wandb
-from dataclass_helper import Args
+from utils.dataclass_helper import Args
 from ppo_module import PPOagent
 from ppo_module import Memory
 from utils.helper import calc_mean

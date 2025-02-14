@@ -1,12 +1,12 @@
 """
-This script contains the maintraining loop for training the DQN agent.
+This script contains the main training loop for training the DQN agent.
 """
+import torch
+import wandb
 from dqn_module import DQNagent
 from game_env import Environment
 from utils.helper import calc_mean
-from dataclass_helper import Args
-import torch
-import wandb
+from utils.dataclass_helper import Args
 
 if __name__ == "__main__":
 

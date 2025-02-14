@@ -6,11 +6,14 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
 from torch.utils.data import DataLoader, TensorDataset
+from typing import Optional
 
 class PPOagent(nn.Module):
-    def __init__(self, memory, device, n_observations, n_actions, gamma, gae_lambda, batch_size, mini_batchsize, update_epoch, clip_coef, learning_rate):
+
+    def __init__(self, memory: 'Memory', device: torch.device, n_observations: int, n_actions: int, 
+                 gamma: float, gae_lambda: float, batch_size: int, mini_batchsize: int, 
+                 update_epoch: int, clip_coef: float, learning_rate: float):
         super().__init__()
-        #TODO: Maybe remove device?
         self.critic = PPO(n_observations, 1, 1.0).to(device)
         self.actor = PPO(n_observations, n_actions, 0.01).to(device)
         self.memory = memory
@@ -23,23 +26,25 @@ class PPOagent(nn.Module):
         self.clip_coef = clip_coef
         self.optimizer = optim.Adam(list(self.actor.parameters()) + list(self.critic.parameters()), lr=learning_rate, eps=1e-5)
 
-    def get_value(self, x):
+    def get_value(self, x: torch.Tensor) -> torch.Tensor:
         return self.critic(x)
 
-    def get_action_and_value(self, x, action=None):
+    def get_action_and_value(self, x: torch.Tensor, action: Optional[torch.Tensor] = None):
         logits = self.actor(x)
         probs = Categorical(logits=logits)
         if action is None:
             action = probs.sample()
         return action, probs.log_prob(action), probs.entropy(), self.critic(x)
     
-    def optimize(self, loss, max_grad_norm):
+    def optimize(self, loss: torch.Tensor, max_grad_norm: float):
         self.optimizer.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm_(self.parameters(), max_grad_norm)
         self.optimizer.step()
 
-    def optimise_networks(self, next_obs, next_done, num_steps, ent_coef, vf_coef, norm_adv, clip_vloss, max_grad_norm, target_kl):
+    def optimise_networks(self, next_obs: torch.Tensor, next_done: torch.Tensor, num_steps: int, ent_coef: float, 
+                          vf_coef: float, norm_adv: bool, clip_vloss: bool, max_grad_norm: float, 
+                          target_kl: Optional[float]) -> None:    
         with torch.no_grad():
             next_value = self.get_value(next_obs).reshape(1, -1)
             advantages = torch.zeros_like(self.memory.rewards).to(self.device)
@@ -77,7 +82,6 @@ class PPOagent(nn.Module):
                 ratio = logratio.exp()
 
                 with torch.no_grad():
-                    old_approx_kl = (-logratio).mean()
                     approx_kl = ((ratio - 1) - logratio).mean()
                     clipfracs += [((ratio - 1.0).abs() > self.clip_coef).float().mean().item()]
 
@@ -108,27 +112,23 @@ class PPOagent(nn.Module):
                 if target_kl is not None and approx_kl > target_kl:
                     break
 
-        #y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
-        #var_y = np.var(y_true)
-        #explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y\
         #TODO: return some useful stats
         return None
 
-    def save(self, name, game_map, start_pos):
+    def save(self, name: str, game_map: str, start_pos: str):
         #TODO maybe give string for name
         torch.save(self.actor.state_dict(), "saved_models/ppo_" + game_map + "_" + start_pos + "_" + str(name) + ".pth")
 
-    def load(self, file_name):
+    def load(self, file_name: str):
         #TODO: need a file with param to match the pth
         self.actor.load_state_dict(torch.load(file_name))
         self.actor.eval()
 
 class Memory():
-    #TODO: Do we create a memory object in PPOAGENT?
     """ 
         Class that holds memory for ppoagent
     """
-    def __init__(self, num_steps, num_envs, device):
+    def __init__(self, num_steps: int, num_envs: int, device: torch.device):
         self.obs = torch.zeros((num_steps, num_envs) + (9,)).to(device)
         self.actions = torch.zeros((num_steps, num_envs) + ()).to(device)
         self.logprobs = torch.zeros((num_steps, num_envs)).to(device)
@@ -136,7 +136,7 @@ class Memory():
         self.dones = torch.zeros((num_steps, num_envs)).to(device)
         self.values = torch.zeros((num_steps, num_envs)).to(device)
 
-    def update_values(self, step, obs, actions, logprobs, rewards, dones, values):
+    def update_values(self, step: int, obs, actions, logprobs, rewards, dones, values):
         self.obs[step] = obs
         self.actions[step] = actions
         self.logprobs[step] = logprobs
