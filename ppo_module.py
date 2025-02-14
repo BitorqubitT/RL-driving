@@ -88,12 +88,10 @@ class PPOagent(nn.Module):
                 if norm_adv:
                     mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
-                # Policy loss
                 pg_loss1 = -mb_advantages * ratio
                 pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - self.clip_coef, 1 + self.clip_coef)
                 pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
-                # Value loss
                 newvalue = newvalue.view(-1)
                 if clip_vloss:
                     v_loss_unclipped = (newvalue - mb_returns) ** 2
