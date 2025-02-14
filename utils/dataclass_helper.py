@@ -1,6 +1,3 @@
-"""
-This module provides the SpawnHolder class and Args class.
-"""
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 import csv
@@ -25,7 +22,7 @@ class SpawnHolder:
     Attributes:
         data: A dictionary where the key is a string representing the map name,
               and the value is a list of tuples. Each tuple contains three elements:
-              two integers and a float, representing the spawn coordinates and angle.
+              representing the spawn coordinates and angle.
     """
     data: Dict[str, List[Tuple[int, int, float]]] = field(default_factory = dict)
 
@@ -60,6 +57,11 @@ class SpawnHolder:
 
 @dataclass
 class Args:
+    """
+        Represents the arguments for a reinforcement learning experiment.
+    """
+ 
+    #TODO: clean this up
     batch_size: List[int] = field(default_factory=list)
     gamma: List[float] = field(default_factory=list)
     tau: List[float] = field(default_factory=list)
@@ -90,7 +92,7 @@ class Args:
     max_grad_norm: float = 0.0
     target_kl: float = 0.0
     
-    def check_and_iterate_combinations(self):
+    def check_and_iterate_combinations(self) -> List:
         list_attributes = {field_name: value for field_name, value in self.__dict__.items() if isinstance(value, list) and value}
         combinations = list(itertools.product(*list_attributes.values()))
         

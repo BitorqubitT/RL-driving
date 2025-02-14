@@ -1,5 +1,5 @@
 """
-    Load a map to extract wall positions.
+    Load a map to extract wall positions and write them to a file.
 """
 import pygame
 import numpy as np
