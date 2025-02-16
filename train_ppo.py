@@ -123,5 +123,5 @@ if __name__ == "__main__":
                 save_name =  str(max_reward) + "_" + str(mean)
                 agent.save(save_name, game_map, start_pos)
 
-            agent.optimise_networks(next_obs, next_done, num_steps, args.ent_coef, args.vf_coef, args.norm_adv, args.clip_vloss, args.max_grad_norm, args.target_kl)
+            agent.optimize_networks(next_obs, next_done, num_steps, args.ent_coef, args.vf_coef, args.norm_adv, args.clip_vloss, args.max_grad_norm, args.target_kl)
         wandb.finish()

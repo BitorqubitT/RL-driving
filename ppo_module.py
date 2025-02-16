@@ -42,7 +42,7 @@ class PPOagent(nn.Module):
         nn.utils.clip_grad_norm_(self.parameters(), max_grad_norm)
         self.optimizer.step()
 
-    def optimise_networks(self, next_obs: torch.Tensor, next_done: torch.Tensor, num_steps: int, ent_coef: float, 
+    def optimize_networks(self, next_obs: torch.Tensor, next_done: torch.Tensor, num_steps: int, ent_coef: float, 
                           vf_coef: float, norm_adv: bool, clip_vloss: bool, max_grad_norm: float, 
                           target_kl: Optional[float]) -> None:    
         with torch.no_grad():
