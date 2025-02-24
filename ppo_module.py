@@ -1,4 +1,3 @@
-# docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/ppo/#ppopy
 import numpy as np
 import torch
 import torch.nn as nn
@@ -68,11 +67,13 @@ class PPOagent(nn.Module):
         b_returns = returns.reshape(-1)
         b_values = self.memory.values.reshape(-1)
 
+        if norm_adv:
+            b_advantages = (b_advantages - b_advantages.mean()) / (b_advantages.std() + 1e-8)
+
         # Create DataLoader for batch processing
         dataset = TensorDataset(b_obs, b_logprobs, b_actions, b_advantages, b_returns, b_values)
         dataloader = DataLoader(dataset, batch_size=self.minibatch_size, shuffle=False)
 
-        clipfracs = []
         for _ in range(self.update_epochs):
             for batch in dataloader:
                 mb_obs, mb_logprobs, mb_actions, mb_advantages, mb_returns, mb_values = batch
@@ -81,12 +82,11 @@ class PPOagent(nn.Module):
                 logratio = newlogprob - mb_logprobs
                 ratio = logratio.exp()
 
-                with torch.no_grad():
-                    approx_kl = ((ratio - 1) - logratio).mean()
-                    clipfracs += [((ratio - 1.0).abs() > self.clip_coef).float().mean().item()]
-
-                if norm_adv:
-                    mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
+                if target_kl is not None:
+                    with torch.no_grad():
+                        approx_kl = ((ratio - 1) - logratio).mean()
+                        if approx_kl > target_kl:
+                            return  # Early stopping
 
                 pg_loss1 = -mb_advantages * ratio
                 pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - self.clip_coef, 1 + self.clip_coef)
@@ -106,9 +106,6 @@ class PPOagent(nn.Module):
                 loss = pg_loss - ent_coef * entropy_loss + v_loss * vf_coef
 
                 self.optimize(loss, max_grad_norm)
-
-                if target_kl is not None and approx_kl > target_kl:
-                    break
 
         #TODO: return some useful stats
         return None
