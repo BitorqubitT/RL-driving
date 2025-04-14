@@ -22,9 +22,6 @@
   </li>
 </ul>
 
-<p><img width="801" alt="results" src="https://github.com/user-attachments/assets/f30dda29-996c-4cd8-93ca-3ff36bd91d8f" /></p>
-
-
 <h2>🎥 Explaining my implementation</h2>
 
 <p align="center">
@@ -33,6 +30,7 @@
   </a>
 </p>
 
+<p><img width="801" alt="results" src="https://github.com/user-attachments/assets/f30dda29-996c-4cd8-93ca-3ff36bd91d8f" /></p>
 
 <h2>📚 References</h2>
 
