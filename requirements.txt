@@ -1,0 +1,6 @@
+numpy==2.2.4
+pandas==2.2.3
+pygame==2.5.2
+pygame_ce==2.4.1
+torch==2.6.0+cu118
+wandb==0.16.4

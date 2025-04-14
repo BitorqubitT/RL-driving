@@ -83,6 +83,9 @@ class Environment():
             list: The state of the car.
         """
         self.cars = []
+        if self.mode == "player":
+            self.car_group = pygame.sprite.Group()
+
         for i in range(0, self.number_of_players):
             if self.start_pos == "random":
                 pos = random.choice(self.start_locations.get_spawn_data(self.map))
@@ -92,14 +95,13 @@ class Environment():
             diff_car = "car13.png"
             diff_car2 = "car12.png"
             car_name = "assets/"
-            if i == 0:
+            if i in [0, 1, 2, 3, 4, 5, 6, 7]:
                 car_name += diff_car
-            elif i == 1:
+            else:
                 car_name += diff_car2
             car = Car(car_name, pos[0], pos[1], pos[2], self.mode)
             self.cars.append(car)
             if self.mode == "player":
-                self.car_group = pygame.sprite.Group()
                 self.car_group.add(car)
             car.update(self.walls)
             self.checkpoints = self._set_checkpoints()
@@ -126,27 +128,26 @@ class Environment():
             self._render()
 
         return_per_car = []
-        for i, carr in enumerate(self.cars):
-            carr.action(all_keys[i])
+        for i, car in enumerate(self.cars):
             reward = 0
-            carr.update(self.walls)
-            hit_wall_check = carr.hitwall
-            finished = False
+            car.action(all_keys[i])
+            car.update(self.walls)
+            hit_wall_check = car.hitwall
+            finished = False # old can remove it
             if hit_wall_check:
                 reward -= 1
 
-            all_checkpoints_checked = [carr.check_checkpoint(checkpoint) for checkpoint in self.checkpoints]
+            all_checkpoints_checked = [car.check_checkpoint(checkpoint) for checkpoint in self.checkpoints]
 
-            if self.mode in {"ai", "player"}:
-                if any(all_checkpoints_checked):
-                    find_index = all_checkpoints_checked.index(True)
-                    if self.last_checkpoint != self.checkpoints[find_index]:
-                        reward += 1
-                        self.last_checkpoint = self.checkpoints[find_index]
+            if any(all_checkpoints_checked):
+                find_index = all_checkpoints_checked.index(True)
+                if self.last_checkpoint != self.checkpoints[find_index]:
+                    reward += 1
+                    self.last_checkpoint = self.checkpoints[find_index]
 
-            return_per_car.append([carr.state, reward, hit_wall_check, finished])
+            return_per_car.append([car.state, reward, hit_wall_check, finished])
             if hit_wall_check:
-                carr.reset()
+                car.reset()
 
         return return_per_car
 

@@ -15,10 +15,8 @@ from utils.helper import calc_mean
 
 if __name__ == "__main__":
 
-    # TODO: Which ones to remove? Cleaner batch_size setup etc. Check ppo paper
-
     args = Args(
-    batch_size=[5000], #5000
+    batch_size=[5000],
     gamma=[0.99],
     tau=[0.005],
     lr=[1e-3],
@@ -31,7 +29,7 @@ if __name__ == "__main__":
     game_map= ["track 3"],
     architecture="2 layer 64",
     loss_function="",
-    start_pos= ["static", "random"],
+    start_pos= ["random"],
     minibatch_size= 1250, #1250
     num_iterations= 4000, # 4000
     seed= 1,
@@ -56,11 +54,9 @@ if __name__ == "__main__":
     device = torch.device("cpu")
 
     for combination in args.check_and_iterate_combinations():
-        print(combination)
         batch_size, gamma, tau, lr, episodes, eps_start, eps_end, eps_decay, n_actions, n_observations, game_map, start_pos, num_steps, update_epochs, clip_coef = combination
-        #print("project name:", game_map, start_pos)
         wandb.init(
-            project = "rl_ppo_2*64_run2_",
+                        project = "rl_ppo_2*64_run2_newwei_",
             name = f"experiment_{game_map}_{start_pos}",
             config={"batch_size": batch_size,
                     "gamma": gamma,
@@ -95,7 +91,7 @@ if __name__ == "__main__":
             next_obs = envs.reset()
             next_obs = torch.tensor(next_obs, dtype=torch.float32, device=device).unsqueeze(0)[0]
             next_done = torch.zeros(1).to(device)
-            
+
             for step in range(0, num_steps):
                 
                 with torch.no_grad():
@@ -112,7 +108,7 @@ if __name__ == "__main__":
                 max_reward += reward
                 done = terminations or truncations
 
-                if done or step >= 4998:
+                if done or step >= 5000:
                     mean = calc_mean(all_rewards)
                     all_rewards.append(max_reward)
                     print(f"global_step={iteration} Steps taken={step} reward={max_reward} mean reward={mean}")
@@ -120,8 +116,10 @@ if __name__ == "__main__":
                     break
 
             if max_reward >= 300 or mean >= 160:
-                save_name =  str(max_reward) + "_" + str(mean)
+                save_name =  str(max_reward) + "_weeeee_" + str(mean)
                 agent.save(save_name, game_map, start_pos)
 
             agent.optimize_networks(next_obs, next_done, num_steps, args.ent_coef, args.vf_coef, args.norm_adv, args.clip_vloss, args.max_grad_norm, args.target_kl)
+            memory.clear()
+
         wandb.finish()
