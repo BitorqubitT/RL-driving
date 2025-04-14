@@ -4,15 +4,6 @@
 
 <p><img src="https://github.com/user-attachments/assets/16513033-3a17-43fb-97b8-074affe5a7d3" alt="demo gif"></p>
 
-<h2>🎥 Demo</h2>
-
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=MHJ9NWQA5M8">
-    <img src="https://img.youtube.com/vi/MHJ9NWQA5M8/hqdefault.jpg" alt="Watch the video" />
-  </a>
-</p>
-
-
 <h2>📁 Notable Files & Folders</h2>
 
 <p>Some files that may not be self-explanatory:</p>
@@ -31,8 +22,17 @@
   </li>
 </ul>
 
-
 <p><img width="801" alt="results" src="https://github.com/user-attachments/assets/f30dda29-996c-4cd8-93ca-3ff36bd91d8f" /></p>
+
+
+<h2>🎥 Explaining my implementation</h2>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=MHJ9NWQA5M8">
+    <img src="https://img.youtube.com/vi/MHJ9NWQA5M8/hqdefault.jpg" alt="Watch the video" />
+  </a>
+</p>
+
 
 <h2>📚 References</h2>
 
